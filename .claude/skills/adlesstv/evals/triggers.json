@@ -1,0 +1,10 @@
+{
+  "skill": "adlesstv",
+  "test_cases": [
+    {"input": "debloat my Android TV", "should_trigger": true},
+    {"input": "limpia la tele de anuncios con ADB", "should_trigger": true},
+    {"input": "configura el launcher de AdLessTV", "should_trigger": true},
+    {"input": "cómo instalar OpenCore en Hackintosh", "should_trigger": false},
+    {"input": "revisa este código Python PEP8", "should_trigger": false}
+  ]
+}
