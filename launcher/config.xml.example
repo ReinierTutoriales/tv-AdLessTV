@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Configuración del lanzador AdLessTV.
+  Edita este archivo y reconstruye.
+-->
+<resources>
+    <!-- Apps fijas en el dock inferior (orden) -->
+    <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>com.plexapp.android</item>
+    </string-array>
+
+    <!-- Apps que no se muestran en el grid -->
+    <string-array name="hidden_apps">
+        <item>com.google.android.tvlauncher</item>
+    </string-array>
+
+    <!-- Paquete de Live TV / sintonizador (opcional) -->
+    <string name="live_tv_package" translatable="false"></string>
+
+    <!-- Columnas del grid -->
+    <integer name="columns">4</integer>
+
+    <!-- Idioma preferido (es / en) -->
+    <string name="preferred_locale">es</string>
+</resources>

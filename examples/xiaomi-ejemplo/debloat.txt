@@ -1,0 +1,13 @@
+# Telemetría y anuncios típicos (Xiaomi ejemplo)
+# Desactiva solo lo que no uses. Prueba varios días.
+
+# Analíticas y telemetría del fabricante
+com.xiaomi.tv.analytics
+com.mitv.analytics
+
+# Contenido patrocinado / PatchWall
+com.mitv.tvhome
+com.xiaomi.mitv.shop
+
+# Servicios de red no esenciales
+com.xiaomi.miplay
