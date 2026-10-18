@@ -1,8 +1,6 @@
 ---
 name: adlesstv
 description: "Use when working on AdLessTV: debloating Android TV/Google TV via ADB, building or configuring the clean launcher, managing reversible package disables, or using the project tools and prompt."
-type: workflow
-lifecycle: active
 ---
 
 # AdLessTV — Lanzador limpio y debloat para Android TV
@@ -79,3 +77,4 @@ Después de cambios importantes:
 - Ver `PROMPT.md` para el flujo completo con agentes.
 - Ver `docs/DISENO.md` para principios de diseño del lanzador.
 - Ver `examples/` para listas de debloat por modelo.
+
