@@ -15,7 +15,7 @@ Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes del estándar A
 
 - **Nunca desinstales** paquetes del sistema. Solo `pm disable-user --user 0`.
 - Todo debe ser **reversible**. Siempre genera o usa el restore.
-- Trabaja sobre el dispositivo real por ADB (Wi-Fi, puerto 5555). Verifica con capturas cuando sea posible.
+- Para operaciones en la TV, trabaja por ADB TCP y verifica con capturas cuando sea posible. Para cambios de código sin dispositivo, ejecuta las pruebas y declara pendiente la validación física.
 - Mantén el lanzador **ligero**: sin red, sin servicios en segundo plano, sin polling. Pensado para ~1 GB RAM.
 - Pregunta antes de desactivar algo que pueda afectar inputs HDMI, voz, Chromecast o actualizaciones.
 
@@ -31,15 +31,17 @@ Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes del estándar A
    - Lista paquetes con `pm list packages`.
    - Clasifica telemetría, anuncios, contenido patrocinado y bloat.
    - Genera o edita un `examples/<modelo>/debloat.txt` comentado.
-   - Aplica con `tools/disable.sh`.
+   - Simula primero con `tools/disable.sh mi-lista.txt`.
+   - Tras autorizar la lista, aplica con `tools/disable.sh mi-lista.txt --apply --snapshot backups/operacion-nueva.json`.
+   - Protege HOME, teclados e infraestructura básica. No ejecutes operaciones simultáneas.
 
 4. **Lanzador**  
-   - Configura dock y apps ocultas en `launcher/app/src/main/res/values/config.xml` (o el example).
-   - Instala y establece como home.
-   - Desactiva el lanzador de fábrica solo después de que el nuevo esté instalado y funcione.
+   - Actualmente solo existe `launcher/config.xml.example`; no hay aplicación Android ni APK.
+   - Si se solicita implementarlo, sigue `docs/DISENO.md`: Java + AndroidX RecyclerView, sin red ni servicios permanentes.
+   - No cambies HOME ni desactives el lanzador de fábrica con estas herramientas.
 
 5. **Restore**  
-   Usa `tools/restore.sh` si algo falla.
+   Usa `tools/restore.sh backups/operacion-nueva.json`. Restaura los estados guardados de los paquetes intentados, también tras una desconexión. No recibe `debloat.txt`. El respaldo no contiene datos de usuario ni firmware.
 
 ## Comandos útiles
 
@@ -47,13 +49,15 @@ Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes del estándar A
 export TV_HOST=192.168.1.50
 python3 tools/tv.py --probe
 python3 tools/tv.py 'pm list packages'
-./tools/disable.sh examples/xiaomi-ejemplo/debloat.txt
-./tools/restore.sh examples/xiaomi-ejemplo/debloat.txt
+bash tools/disable.sh mi-lista.txt
+mkdir -p backups
+bash tools/disable.sh mi-lista.txt --apply --snapshot backups/operacion-nueva.json
+bash tools/restore.sh backups/operacion-nueva.json
 ```
 
 ## Configuración del lanzador
 
-Edita `config.xml`:
+La configuración propuesta en `launcher/config.xml.example` no se aplica hasta implementar el lanzador:
 - `dock_apps`: las 4 apps del dock inferior (orden importa).
 - `hidden_apps`: apps que no deben aparecer en el grid.
 - `columns`: número de columnas.
@@ -68,7 +72,8 @@ El proyecto está pensado para convivir con bloqueadores locales de DNS/VPN (com
 Después de cambios importantes:
 - Inyecta teclas D-pad.
 - Saca capturas (`screencap`).
-- Confirma que Home abre el nuevo lanzador.
+- Confirma que Home sigue abriendo el lanzador existente.
+- Para cambios de código: ejecuta `python -m unittest discover -s tests -v`; no presentes pruebas simuladas como validación en TV.
 - Confirma que Inputs y apps principales siguen funcionando.
 
 ## Referencias

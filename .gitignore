@@ -7,3 +7,5 @@ launcher/local.properties
 launcher/app/build/
 *.apk
 .DS_Store
+backups/
+*.json.tmp
