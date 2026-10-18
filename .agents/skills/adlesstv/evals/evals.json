@@ -1,0 +1,20 @@
+{
+  "skill": "adlesstv",
+  "test_cases": [
+    {
+      "name": "debloat_safe",
+      "input": "Limpia mi Xiaomi TV de anuncios y telemetría sin desinstalar nada",
+      "assertions": ["Usa solo pm disable-user", "Genera o usa debloat.txt", "Menciona restore", "Pregunta antes de desactivar servicios críticos"]
+    },
+    {
+      "name": "configure_launcher",
+      "input": "Quiero poner Netflix, YouTube y Plex en el dock del lanzador",
+      "assertions": ["Edita config.xml dock_apps", "Mantiene el lanzador ligero", "No añade red ni servicios"]
+    },
+    {
+      "name": "restore",
+      "input": "Algo se rompió en la TV, quiero volver atrás",
+      "assertions": ["Usa tools/restore.sh", "Reactiva paquetes", "Restaura lanzador de fábrica"]
+    }
+  ]
+}
