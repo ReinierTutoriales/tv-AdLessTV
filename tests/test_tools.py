@@ -277,7 +277,7 @@ class WrapperTests(unittest.TestCase):
             ('restore.ps1', "-Snapshot 'my backup.json'",
              ['--host', '192.0.2.1', 'restore', 'my backup.json'])]:
             command = ("function FakePython { ConvertTo-Json -Compress -InputObject @($args); $global:LASTEXITCODE = 7 }; "
-                       "& $env:TEST_WRAPPER " + arguments + " -TvHost 192.0.2.1 -Python FakePython")
+                       "& $env:TEST_WRAPPER " + arguments + " -TvHost 192.0.2.1 -Python FakePython; exit $LASTEXITCODE")
             result = subprocess.run(['pwsh', '-NoProfile', '-Command', command], capture_output=True,
                                     text=True, env={**os.environ, 'TEST_WRAPPER': str(root / 'tools' / script)})
             self.assertEqual(result.returncode, 7, result.stderr)
