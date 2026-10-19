@@ -1,42 +1,38 @@
-# Prompt para AdLessTV
+# Prompt para trabajar con AdLessTV
 
-Pega este texto en Claude Code, Cursor o cualquier agente con acceso a shell y red local.
+Pega este texto en un agente con acceso a shell y a tu red local.
 
 ---
 
-Quiero limpiar mi Android TV / Google TV de anuncios y telemetría y sustituir el lanzador de fábrica por uno limpio y ligero.
+Quiero revisar mi Android TV / Google TV y reducir paquetes innecesarios de forma recuperable.
+Modelo y firmware: [ESCRIBE AQUÍ]. IP y puerto ADB: [ESCRIBE AQUÍ].
 
-Modelo de mi TV: [ESCRIBE AQUÍ EL MODELO].
+Lee primero el código y el README. No anuncies funciones no implementadas: `launcher/` contiene solo un XML de ejemplo, no un lanzador compilable.
 
-Trabaja sobre el dispositivo real por ADB (Wi-Fi, puerto 5555). Verifica cada paso con capturas de pantalla. Pregúntame antes de desactivar algo que pueda afectar funciones que uso.
+## Conexión e inventario
 
-### Conexión
-- Encuentra la TV en la red (o pide la IP).
-- Conecta con las herramientas de este repositorio (`tools/tv.py`).
-- Haz un backup completo de paquetes, propiedades y ajustes antes de cambiar nada.
+- Usa un entorno virtual e instala `tools/requirements.txt`.
+- Conecta con `tools/tv.py --probe`; espera a que autorice la clave en la TV.
+- ADB TCP con RSA está soportado; el emparejamiento TLS no está implementado.
+- Guarda en `backups/` el inventario y las propiedades necesarias; esto no es una copia del firmware ni de los datos.
+- Pregúntame qué apps, voz, Chromecast y actualizaciones quiero conservar.
 
-### Debloat
-- Lista todos los paquetes instalados.
-- Clasifica y propón desactivar: telemetría del fabricante, servicios de anuncios, filas de contenido patrocinado, apps preinstaladas que no uso y servicios en segundo plano innecesarios.
-- Usa únicamente `pm disable-user --user 0`. Nunca desinstales paquetes del sistema.
-- Pregúntame qué apps de streaming, voz, Chromecast o actualizaciones quiero conservar.
-- Genera un `debloat.txt` comentado y un script de restore.
+## Debloat
 
-### Lanzador
-- Construye o adapta el lanzador de `launcher/` (Java, AndroidX RecyclerView, ligero, sin red ni servicios en segundo plano).
-- Instálalo por ADB, establécelo como home y desactiva el lanzador de fábrica.
-- Diseño: fondo negro puro, dock inferior con mis 4 apps favoritas, grid de aplicaciones, reloj y fecha, botones de Inputs / Wi-Fi / Ajustes.
-- Navegación D-pad determinista.
-- Edita `launcher/app/src/main/res/values/config.xml` según mis preferencias.
-- Incluye soporte de localización en español.
+- Identifica cada paquete y sus dependencias en mi firmware; no apliques listas de ejemplo sin revisarlas.
+- Genera una lista comentada. No incluyas HOME, teclados, actualizaciones que quiero conservar ni servicios críticos.
+- Ejecuta `tools/debloat.py disable mi-lista.txt` para mostrar el plan sin cambios.
+- Tras mi autorización de esa lista, aplica con `--apply --snapshot backups/operacion-nueva.json`.
+- Usa un respaldo nuevo por operación y no ejecutes sesiones simultáneas.
+- Ante un fallo, detente. Informa de lo aplicado y conserva el respaldo; no encadenes cambios a ciegas.
+- Para recuperar: `tools/debloat.py restore backups/operacion-nueva.json`.
+- No desinstales paquetes, no cambies HOME, no modifiques DNS/VPN ni ajustes de red para realizar este trabajo.
 
-### Verificación
-Después de cada cambio importante, inyecta teclas y saca capturas para confirmar que todo funciona.
+## Verificación y entrega
 
-Al final entrega:
-- Lista de paquetes desactivados.
-- Script de restore.
-- Instrucciones para volver a activar apps concretas.
-- Confirmación de que el lanzador es el home por defecto.
+- Valida el funcionamiento de las apps conservadas, ajustes, teclado, mando y regreso a HOME.
+- Captura la pantalla cuando sea posible; una entrada HDMI puede impedir la captura.
+- Entrega la lista aplicada, la ruta del respaldo, los comandos de restauración y las pruebas reales realizadas.
+- Si no tienes acceso a la TV, declara esa limitación; las pruebas simuladas no demuestran compatibilidad física.
 
-Todo debe ser reversible.
+Si después solicito construir un lanzador, impleméntalo como una tarea separada siguiendo `docs/DISENO.md`. Comprueba el APK sin sustituir el inicio de fábrica. No desactives el HOME original.

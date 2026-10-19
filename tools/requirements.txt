@@ -1,11 +1,1 @@
-# Dependencias de Python
-
-Para las herramientas de ADB:
-
-```bash
-python3 -m venv tools/venv
-source tools/venv/bin/activate   # o tools/venv/Scripts/activate en Windows
-pip install adb-shell
-```
-
-Luego usa `tools/venv/bin/python tools/tv.py ...` o ajusta la variable PYTHON.
+adb-shell==0.4.4

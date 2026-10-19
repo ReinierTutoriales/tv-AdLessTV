@@ -1,12 +1,13 @@
-# Listas de debloat por modelo
+# Listas orientativas de paquetes
 
-Cada carpeta contiene un `debloat.txt` con paquetes seguros de desactivar en ese firmware, agrupados y comentados.
+Estas listas son puntos de partida para investigar, **no listas certificadas como seguras**. Un mismo nombre puede tener dependencias diferentes según el firmware.
 
-Añade el tuyo después de probarlo varios días.
+| Carpeta | Referencia | Estado |
+|---------|------------|--------|
+| `xiaomi-ejemplo/` | Paquetes habituales de Xiaomi Mi TV | Orientativo, sin validación física documentada |
 
-| Carpeta              | Modelo                  | Notas                          |
-|----------------------|-------------------------|--------------------------------|
-| xiaomi-ejemplo/      | Xiaomi Mi TV            | PatchWall, analíticas, MiLink  |
-| tcl-ejemplo/         | TCL Google TV           | TCL TV+, demos, smartlink      |
+Crea una lista propia con un paquete por línea y comentarios `#`. Conserva las funciones que uses. Los lanzadores HOME y teclados detectados se protegen automáticamente: no intentes eludir esa comprobación para aplicar una lista completa.
 
-Copia un ejemplo, ajusta y documenta cualquier paquete que hayas tenido que reactivar.
+El archivo de ejemplo incluye PatchWall; si es un HOME registrado en tu TV, el plan se rechazará y tendrás que retirarlo de tu lista. No se sustituye el lanzador de fábrica.
+
+Antes de aplicar, ejecuta una simulación. Guarda el respaldo en `backups/` y úsalo para restaurar estados originales; `restore.sh` y `restore.ps1` reciben ese JSON, no la lista de paquetes.
