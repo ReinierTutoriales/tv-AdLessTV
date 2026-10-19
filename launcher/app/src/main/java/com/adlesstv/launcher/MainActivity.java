@@ -71,6 +71,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override public void onAvailable(@NonNull Network network) { main.post(MainActivity.this::updateNetwork); }
         @Override public void onLost(@NonNull Network network) { main.post(MainActivity.this::updateNetwork); }
+        @Override public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities capabilities) {
+            main.post(MainActivity.this::updateNetwork);
+        }
     };
     private AppRepository repository;
     private AppAdapter adapter;
@@ -81,6 +84,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private View network;
     private View inputs;
     private View settings;
+    private View heroOpen;
+    private View heroInfo;
+    private TextView heroName;
+    private AppRepository.App selectedApp;
     private String lastFocused;
     private boolean resumed;
     private boolean callbackRegistered;
@@ -112,8 +119,18 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         inputs = findViewById(R.id.action_inputs);
         settings = findViewById(R.id.action_settings);
         network = findViewById(R.id.action_network);
+        heroOpen = findViewById(R.id.hero_open);
+        heroInfo = findViewById(R.id.hero_info);
+        heroName = findViewById(R.id.hero_name);
+        heroOpen.setOnClickListener(v -> { if (selectedApp != null) openApp(selectedApp); });
+        heroInfo.setOnClickListener(v -> { if (selectedApp != null) openAppDetails(selectedApp); });
+        heroOpen.setOnKeyListener((v, key, event) -> heroKey(key, event));
+        heroInfo.setOnKeyListener((v, key, event) -> heroKey(key, event));
         if (Build.VERSION.SDK_INT >= 33) {
-            backCallback = () -> settings.requestFocus();
+            backCallback = () -> {
+                pendingGridPosition = RecyclerView.NO_POSITION;
+                settings.requestFocus();
+            };
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
@@ -131,7 +148,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         grid.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
         grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             int available = right - left - grid.getPaddingLeft() - grid.getPaddingRight();
-            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 172)));
+            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 144)));
             if (columns != layout.getSpanCount()) {
                 layout.setSpanCount(columns);
                 adapter.setColumns(columns);
@@ -158,13 +175,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 }
                 if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
                     int selected = adapter.indexOf(lastFocused);
-                    focusGrid(selected >= 0 ? selected : adapter.firstApp());
+                    heroOpen.requestFocus();
                     return true;
                 }
                 return false;
-            });
-            actions[i].setOnFocusChangeListener((v, focused) -> {
-                if (focused) pendingGridPosition = RecyclerView.NO_POSITION;
             });
         }
         IntentFilter packages = new IntentFilter();
@@ -293,6 +307,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             if (!hidden.contains(app.packageName()) && !pinnedKeys.contains(app.key())) rest.add(app);
         }
         adapter.replace(pinned, rest);
+        selectedApp = null;
+        if (adapter.firstApp() >= 0) {
+            int candidate = adapter.indexOf(lastFocused);
+            selectedApp = adapter.at(candidate >= 0 ? candidate : adapter.firstApp());
+        }
+        updateHero();
         empty.setText(R.string.no_apps);
         empty.setVisibility(adapter.firstApp() < 0 ? View.VISIBLE : View.GONE);
         int selected = adapter.indexOf(lastFocused);
@@ -319,6 +339,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     @Override public void focused(AppRepository.App app) {
         pendingGridPosition = RecyclerView.NO_POSITION;
         lastFocused = app.key();
+        selectedApp = app;
+        updateHero();
     }
     @Override public void opened(AppRepository.App app) { openApp(app); }
     @Override public void options(AppRepository.App app) { showOptions(app); }
@@ -334,7 +356,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         else return false;
         int from = pendingGridPosition >= 0 ? pendingGridPosition : position;
         int next = adapter.move(from, direction);
-        if (next == GridNavigation.TOP_BAR) inputs.requestFocus();
+        if (next == GridNavigation.TOP_BAR) {
+            pendingGridPosition = RecyclerView.NO_POSITION;
+            inputs.requestFocus();
+        }
         else if (next != from) focusGrid(next);
         return true;
     }
@@ -374,9 +399,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 repository.saveFavorites(selection);
             } else if (action == R.string.hide) repository.setHidden(app.packageName(), true);
             else if (action == R.string.app_details) {
-                try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:" + app.packageName()))); }
-                catch (RuntimeException ignored) { toast(R.string.action_unavailable); }
+                openAppDetails(app);
                 return;
             } else {
                 int adjacent = action == R.string.move_left ? index - 1 : index + 1;
@@ -474,10 +497,43 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void updateNetwork() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        boolean connected = cm != null && cm.getActiveNetwork() != null;
+        Network active = cm == null ? null : cm.getActiveNetwork();
+        NetworkCapabilities capabilities = active == null ? null : cm.getNetworkCapabilities(active);
+        boolean connected = capabilities != null
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
         network.setAlpha(connected ? 1f : 0.55f);
         network.setContentDescription(getString(R.string.network) + ": "
                 + getString(connected ? R.string.connected : R.string.offline));
+    }
+
+    private void updateHero() {
+        heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
+        heroOpen.setEnabled(selectedApp != null);
+        heroInfo.setEnabled(selectedApp != null);
+    }
+
+    private boolean heroKey(int key, KeyEvent event) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+        if (key == KeyEvent.KEYCODE_DPAD_UP) { inputs.requestFocus(); return true; }
+        if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
+            int selected = adapter.indexOf(lastFocused);
+            focusGrid(selected >= 0 ? selected : adapter.firstApp());
+            return true;
+        }
+        if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            boolean towardsInfo = key == KeyEvent.KEYCODE_DPAD_RIGHT;
+            if (getWindow().getDecorView().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL)
+                towardsInfo = !towardsInfo;
+            (towardsInfo ? heroInfo : heroOpen).requestFocus();
+            return true;
+        }
+        return false;
+    }
+
+    private void openAppDetails(AppRepository.App app) {
+        try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + app.packageName()))); }
+        catch (RuntimeException ignored) { toast(R.string.action_unavailable); }
     }
 
     private void openSettings(String action) {
@@ -496,6 +552,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     // Android 13+ uses OnBackInvokedCallback; older TV versions still dispatch here.
     @SuppressLint("GestureBackNavigation")
     @Override public void onBackPressed() {
+        pendingGridPosition = RecyclerView.NO_POSITION;
         settings.requestFocus();
     }
 }

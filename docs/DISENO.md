@@ -1,5 +1,7 @@
 # Diseño y estado de AdLessTV
 
+La revisión de defectos, el objetivo visual de la interfaz y las verificaciones pendientes se mantienen en [AUDITORIA.md](AUDITORIA.md).
+
 ## Implementado
 
 Cliente ADB TCP en Python, lotes con comprobación del resultado, push/pull, simulación de debloat, protección de HOME/teclados/paquetes básicos y restauración con registro previo de cada intento. Bash y PowerShell usan el mismo motor para evitar divergencias.

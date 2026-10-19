@@ -172,7 +172,8 @@ class DebloatTests(unittest.TestCase):
         self.assertFalse(self.path.exists())
 
     def test_protects_all_homes_keyboards_and_core(self):
-        for package in ('com.test.home', 'com.other.launcher', 'com.test.keyboard', 'com.android.systemui'):
+        for package in ('com.test.home', 'com.other.launcher', 'com.test.keyboard',
+                        'com.android.systemui', 'com.android.tv.settings'):
             with self.assertRaisesRegex(ValueError, 'protegidos'):
                 debloat.plan(self.dev, [package])
         self.assertEqual(self.dev.writes, [])

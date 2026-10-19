@@ -23,7 +23,7 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 
 ## Preparación
 
-Requiere Python 3.10 o posterior. En la TV, activa las opciones de desarrollador y la depuración ADB. El modo y puerto dependen del fabricante: algunas TVs exponen TCP 5555; otras requieren emparejamiento de depuración inalámbrica. Este cliente soporta ADB TCP con autorización RSA, **no el emparejamiento inalámbrico TLS**. Acepta en la TV la clave de tu ordenador.
+Requiere Python 3.11 o posterior. En la TV, activa las opciones de desarrollador y la depuración ADB. El modo y puerto dependen del fabricante: algunas TVs exponen TCP 5555; otras requieren emparejamiento de depuración inalámbrica. Este cliente soporta ADB TCP con autorización RSA, **no el emparejamiento inalámbrico TLS**. Acepta en la TV la clave de tu ordenador.
 
 ### Windows
 
@@ -192,7 +192,7 @@ python -m pip install -r tools/requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Las pruebas cubren claves reales, salida de comandos, simulación, estados originales, paquetes protegidos y recuperación tras fallos con una TV simulada. No sustituyen la validación en un televisor físico. La CI ejecuta Python 3.10 y 3.13 en Linux y Windows, compila los APK debug/release y prueba el recorrido de filas. La tarea de interfaz ejecuta pulsaciones reales y guarda capturas en un emulador Android a 960 × 540 dp y 720 × 480 dp con texto ampliado. El catálogo largo de esas pruebas es una fixture, no aplicaciones descargadas ni una captura de una TV física.
+Las pruebas cubren claves reales, salida de comandos, simulación, estados originales, paquetes protegidos y recuperación tras fallos con una TV simulada. No sustituyen la validación en un televisor físico. La CI ejecuta Python 3.11 y 3.13 en Linux y Windows, compila los APK debug/release y prueba el recorrido de filas. La tarea de interfaz ejecuta pulsaciones reales y guarda capturas en un emulador Android a 960 × 540 dp y 720 × 480 dp con texto ampliado. El catálogo largo de esas pruebas es una fixture, no aplicaciones descargadas ni una captura de una TV física.
 
 - `tools/`: cliente ADB, inventario de paquetes, debloat/restauración y activación/restauración de HOME.
 - `tests/`: regresiones sin dispositivo.

@@ -16,7 +16,8 @@
         </LinearLayout>
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_centerVertical="true"
             android:layout_toStartOf="@id/actions" android:layout_marginEnd="16dp" android:gravity="center_vertical"
-            android:orientation="vertical">
+            android:orientation="vertical" android:paddingStart="14dp" android:paddingEnd="14dp"
+            android:background="@drawable/toolbar_surface">
             <TextClock android:id="@+id/clock" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:format12Hour="h:mm a" android:format24Hour="HH:mm" android:maxLines="1"
                 android:ellipsize="end" android:includeFontPadding="false" android:textColor="#F4F5F8"
@@ -27,6 +28,26 @@
                 android:textColor="#A2A9B6" android:textSize="13sp" />
         </LinearLayout>
     </RelativeLayout>
+    <LinearLayout android:id="@+id/hero" android:layout_width="match_parent"
+        android:layout_height="112dp" android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp" android:orientation="vertical"
+        android:gravity="center_vertical" android:paddingStart="22dp" android:paddingEnd="22dp"
+        android:background="@drawable/hero_surface">
+        <TextView android:id="@+id/hero_name" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+            android:text="@string/app_name" android:textSize="27sp"
+            android:textStyle="bold" android:textColor="#F6F7FA" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/hero_hint" android:textSize="12sp" android:textColor="#B4BEC9"
+            android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginTop="8dp">
+            <Button android:id="@+id/hero_open" style="@style/HeroButton"
+                android:text="@string/open_app" />
+            <Button android:id="@+id/hero_info" style="@style/HeroButton"
+                android:layout_marginStart="10dp" android:text="@string/app_details" />
+        </LinearLayout>
+    </LinearLayout>
     <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/grid" android:layout_width="match_parent"
             android:layout_height="match_parent" android:clipToPadding="false" android:clipChildren="false"
