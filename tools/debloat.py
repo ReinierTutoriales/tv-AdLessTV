@@ -19,7 +19,8 @@ STATES = {0: "default-state", 1: "enable", 2: "disable", 3: "disable-user", 4: "
 CORE = {"android", "com.adlesstv.launcher", "com.android.systemui", "com.android.settings", "com.android.tv.settings", "com.android.shell",
         "com.android.packageinstaller", "com.google.android.packageinstaller",
         "com.google.android.gms", "com.android.vending", "com.google.android.gsf",
-        "com.android.providers.settings", "com.android.providers.media", "com.android.externalstorage",
+        "com.android.providers.settings", "com.android.providers.media", "com.android.providers.tv",
+        "com.android.externalstorage",
         "com.android.inputdevices", "com.android.bluetooth", "com.android.networkstack",
         "com.google.android.networkstack", "com.android.permissioncontroller",
         "com.google.android.permissioncontroller"}
@@ -135,12 +136,16 @@ def write_snapshot(path, data):
 
 def plan(dev, packages):
     require_user_zero(dev)
+    firmware = shell(dev, "getprop ro.build.fingerprint").strip()
+    if not firmware:
+        raise ValueError("No se pudo identificar el firmware; se cancela la planificación.")
     protected = protected_packages(dev)
     blocked = set(packages) & protected
     if blocked:
         raise ValueError("Paquetes protegidos (HOME, teclado o sistema): " + ", ".join(sorted(blocked)))
     # Completar toda la lectura antes de permitir el primer cambio.
     return {"version": 1, "user": 0, "device": identity(dev),
+            "firmware": firmware,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "packages": [{"package": p, "state": package_state(dev, p), "status": "not_started"}
                          for p in packages]}
@@ -152,12 +157,25 @@ def apply(dev, snapshot, path):
     blocked = {entry["package"] for entry in snapshot["packages"]} & protected_packages(dev)
     if blocked:
         raise ValueError("Cambió la protección de estos paquetes: " + ", ".join(sorted(blocked)))
+    if identity(dev) != snapshot["device"]:
+        raise ValueError("El plan ya no corresponde a esta TV o perfil.")
+    if snapshot.get("firmware") and shell(dev, "getprop ro.build.fingerprint").strip() != snapshot["firmware"]:
+        raise ValueError("Cambió el firmware desde la planificación; genera un plan nuevo.")
+    # No comenzar un lote si una entrada posterior ya cambió de estado.
+    for entry in snapshot["packages"]:
+        if package_state(dev, entry["package"]) != entry["state"]:
+            raise ValueError(f"Cambió el estado de {entry['package']} desde la simulación. "
+                             "Genera un plan nuevo antes de modificar la TV.")
     # Reserva exclusiva: nunca sobrescribir un respaldo de otra operación.
     with path.open("x", encoding="utf-8") as stream:
         json.dump(snapshot, stream, ensure_ascii=False, indent=2)
         stream.flush()
         os.fsync(stream.fileno())
     for entry in snapshot["packages"]:
+        require_user_zero(dev)
+        if entry["package"] in protected_packages(dev):
+            raise ValueError(f"{entry['package']} pasó a cumplir una función protegida. "
+                             "Conserva el respaldo y revisa la TV antes de continuar.")
         if package_state(dev, entry["package"]) != entry["state"]:
             raise ValueError(f"Cambió el estado de {entry['package']} desde la simulación. "
                              "Conserva el respaldo y vuelve a planificar antes de seguir.")
@@ -178,6 +196,7 @@ def apply(dev, snapshot, path):
 def validate_snapshot(data):
     if (not isinstance(data, dict) or data.get("version") != 1 or data.get("user") != 0
             or not isinstance(data.get("device"), dict)
+            or ("firmware" in data and (not isinstance(data["firmware"], str) or not data["firmware"]))
             or not isinstance(data.get("packages"), list) or not data["packages"]):
         raise ValueError("Formato de respaldo inválido.")
     seen = set()
@@ -193,6 +212,7 @@ def validate_snapshot(data):
 
 def restore(dev, data, path):
     validate_snapshot(data)
+    require_user_zero(dev)
     if identity(dev) != data["device"]:
         raise ValueError("El respaldo pertenece a otra TV o a otro perfil; no se restaurará.")
     for entry in data["packages"]:
@@ -213,6 +233,8 @@ def verify(dev, data):
     validate_snapshot(data)
     if identity(dev) != data["device"]:
         raise ValueError("El respaldo pertenece a otra TV o a otro perfil.")
+    if data.get("firmware") and shell(dev, "getprop ro.build.fingerprint").strip() != data["firmware"]:
+        raise ValueError("Cambió el firmware desde el respaldo; revisa el perfil y los paquetes.")
     failures = []
     for entry in data["packages"]:
         if entry["status"] == "pending":
