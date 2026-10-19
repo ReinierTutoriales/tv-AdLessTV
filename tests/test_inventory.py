@@ -34,6 +34,22 @@ class InventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "inesperada"):
             inventory.packages("package:com.test.ads\nunauthorized\n")
 
+    def test_review_lists_system_packages_without_classifying_them_as_telemetry(self):
+        answers = {
+            "pm list packages --user 0": "package:com.test.home\npackage:com.test.ads\npackage:com.test.disabled\n",
+            "pm list packages -d --user 0": "package:com.test.disabled\n",
+            "pm list packages -s --user 0": "package:com.test.home\npackage:com.test.ads\npackage:com.test.disabled\n",
+            "getprop ro.build.fingerprint": "build/a",
+        }
+        with patch.object(inventory, "shell", side_effect=lambda _, cmd: answers[cmd]), \
+                patch.object(inventory, "identity", return_value={"serial": "one"}), \
+                patch.object(inventory, "require_user_zero") as check_user, \
+                patch.object(inventory, "protected_packages", return_value={"com.test.home"}):
+            result = inventory.capture(None, review=True)
+        check_user.assert_called_once()
+        self.assertEqual(result["review"]["protected"], ["com.test.home"])
+        self.assertEqual(result["review"]["system_to_review"], ["com.test.ads"])
+
 
 if __name__ == "__main__":
     unittest.main()

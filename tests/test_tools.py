@@ -95,8 +95,14 @@ class Device:
         self.ignore = False
         self.device_id = 'tv-one'
         self.on_write = lambda: None
+        self.current_user = '0'
+        self.tv_input = 'com.test.input/.Input'
+        self.accessibility = 'null'
+        self.vpn = 'null'
 
     def shell(self, command):
+        if command == 'am get-current-user':
+            return self.current_user
         if command == 'settings --user 0 get secure android_id':
             return self.device_id
         if command == 'getprop ro.serialno':
@@ -109,6 +115,12 @@ class Device:
             return 'com.test.home/.Home\ncom.other.launcher/.Home'
         if command == 'ime list -s':
             return 'com.test.keyboard/.Keyboard'
+        if command.startswith('cmd package query-services'):
+            return self.tv_input
+        if command == 'settings --user 0 get secure enabled_accessibility_services':
+            return self.accessibility
+        if command == 'settings --user 0 get secure always_on_vpn_app':
+            return self.vpn
         if command.startswith('dumpsys package '):
             package = command.split()[-1]
             if package not in self.states:
@@ -173,13 +185,59 @@ class DebloatTests(unittest.TestCase):
 
     def test_protects_all_homes_keyboards_and_core(self):
         for package in ('com.test.home', 'com.other.launcher', 'com.test.keyboard',
-                        'com.android.systemui', 'com.android.tv.settings'):
+                        'com.android.systemui', 'com.android.tv.settings',
+                        'com.adlesstv.launcher', 'com.android.bluetooth', 'com.test.input'):
             with self.assertRaisesRegex(ValueError, 'protegidos'):
                 debloat.plan(self.dev, [package])
         self.assertEqual(self.dev.writes, [])
 
+    def test_protects_active_accessibility_and_vpn(self):
+        self.dev.accessibility = 'com.test.first/.Service:com.other.accessibility/.Service'
+        self.dev.vpn = 'com.test.second'
+        for package in ('com.test.first', 'com.test.second', 'com.other.accessibility'):
+            with self.assertRaisesRegex(ValueError, 'protegidos'):
+                debloat.plan(self.dev, [package])
+        self.assertEqual(self.dev.writes, [])
+
+    def test_refuses_other_foreground_users_and_unreadable_roles(self):
+        self.dev.current_user = '10'
+        with self.assertRaisesRegex(ValueError, 'usuario visible'):
+            debloat.plan(self.dev, ['com.test.first'])
+        self.dev.current_user = '0'
+        self.dev.accessibility = 'unreadable'
+        with self.assertRaisesRegex(ValueError, 'accesibilidad'):
+            debloat.plan(self.dev, ['com.test.first'])
+        self.assertEqual(self.dev.writes, [])
+
+    def test_apply_aborts_when_state_or_protection_changes(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
+        self.dev.states['com.test.first'] = 1
+        with self.assertRaisesRegex(ValueError, 'Cambió el estado'):
+            debloat.apply(self.dev, snapshot, self.path)
+        self.assertEqual(self.dev.writes, [])
+        self.dev.states['com.test.first'] = 0
+        self.dev.vpn = 'com.test.first'
+        with self.assertRaisesRegex(ValueError, 'protección'):
+            debloat.apply(self.dev, snapshot, self.path)
+        self.assertEqual(self.dev.writes, [])
+
+    def test_verify_after_reboot_detects_reenabled_or_pending_packages(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
+        debloat.apply(self.dev, snapshot, self.path)
+        saved = json.loads(self.path.read_text())
+        debloat.verify(self.dev, saved)
+        self.dev.states['com.test.first'] = 0
+        with self.assertRaisesRegex(ValueError, 'no conserva'):
+            debloat.verify(self.dev, saved)
+        self.dev.states['com.test.first'] = 3
+        saved['packages'][0]['status'] = 'pending'
+        with self.assertRaisesRegex(ValueError, 'interrumpido'):
+            debloat.verify(self.dev, saved)
+        self.assertEqual(len(self.dev.writes), 2)
+
     def test_missing_home_aborts_before_writes(self):
-        with patch.object(debloat, 'shell', return_value='No activities found'):
+        with patch.object(debloat, 'shell', side_effect=lambda dev, cmd:
+                          'No activities found' if cmd.startswith('cmd package query-activities') else dev.shell(cmd)):
             with self.assertRaisesRegex(ValueError, 'HOME'):
                 debloat.plan(self.dev, ['com.test.first'])
         self.assertEqual(self.dev.writes, [])
