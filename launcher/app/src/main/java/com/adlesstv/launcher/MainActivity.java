@@ -148,7 +148,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         grid.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
         grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             int available = right - left - grid.getPaddingLeft() - grid.getPaddingRight();
-            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 172)));
+            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 144)));
             if (columns != layout.getSpanCount()) {
                 layout.setSpanCount(columns);
                 adapter.setColumns(columns);
