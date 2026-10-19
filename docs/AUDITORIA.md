@@ -20,7 +20,7 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 - La sintaxis Bash de los dos scripts se comprueba por separado en CI; `bash -n archivo1 archivo2` no valida ambos.
 - Python mínimo 3.11; 3.10 terminó soporte el 1 de octubre de 2026.
 - `com.android.tv.settings` queda protegido en la lista básica de debloat. Algunos fabricantes usan otros paquetes: inventariar antes de aplicar.
-- La indicación de red requiere `NET_CAPABILITY_VALIDATED`; la existencia de una red activa no prueba acceso general a Internet.
+- El acceso directo a Wi-Fi ya no consulta la red ni necesita `ACCESS_NETWORK_STATE`. Los APK debug y release solo pueden declarar el permiso interno `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` que protege receptores dinámicos; no concede acceso a la red.
 - El ZIP del wrapper Gradle 9.8.1 se valida con su SHA-256 oficial; el JAR presente coincide con la suma publicada por Gradle. `gradlew` ya tiene modo Git `100755`.
 
 ## Pendientes con evidencia insuficiente
@@ -32,4 +32,4 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 5. Decidir la distribución firmada. `assembleRelease` produce un APK sin firmar; el script instala el debug. Crear un flujo de firma privado y actualización sin comprometer la clave antes de usarlo como HOME permanente.
 6. Fijar las acciones de CI por SHA completo cuando se hayan comprobado las revisiones concretas. La etiqueta mayor puede moverse. Revisar además el indicador de HOME de `dumpsys activity`, que no es API pública.
 
-La ausencia de `INTERNET` en el APK prueba solo que el lanzador no solicita ese permiso. La reducción de telemetría del dispositivo requiere el inventario y la medición de red por firmware descritos en `DISENO.md`.
+La ausencia de permisos de red, identificación y localización en el APK, junto con la revisión del código, respalda que el lanzador no incorpora telemetría propia. Esto no verifica el tráfico de otras apps o del firmware: reducir la telemetría del dispositivo requiere el inventario y la medición de red por firmware descritos en `DISENO.md`.

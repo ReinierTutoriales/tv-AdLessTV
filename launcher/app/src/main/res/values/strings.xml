@@ -5,8 +5,6 @@
     <string name="inputs">Entradas</string>
     <string name="network">Red</string>
     <string name="settings">Ajustes</string>
-    <string name="connected">Internet disponible</string>
-    <string name="offline">Sin Internet validado</string>
     <string name="pin">Añadir a favoritos</string>
     <string name="unpin">Quitar de favoritos</string>
     <string name="move_left">Mover a la izquierda</string>

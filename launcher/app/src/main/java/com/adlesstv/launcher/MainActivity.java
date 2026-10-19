@@ -15,10 +15,6 @@ import android.graphics.Insets;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
-import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -68,13 +64,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             if (resumed) refresh();
         }
     };
-    private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
-        @Override public void onAvailable(@NonNull Network network) { main.post(MainActivity.this::updateNetwork); }
-        @Override public void onLost(@NonNull Network network) { main.post(MainActivity.this::updateNetwork); }
-        @Override public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities capabilities) {
-            main.post(MainActivity.this::updateNetwork);
-        }
-    };
     private AppRepository repository;
     private AppAdapter adapter;
     private ArtworkLoader artwork;
@@ -90,7 +79,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private AppRepository.App selectedApp;
     private String lastFocused;
     private boolean resumed;
-    private boolean callbackRegistered;
     private boolean dirty = true;
     private boolean scanning;
     private boolean destroyed;
@@ -216,27 +204,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
-        updateNetwork();
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        if (cm != null && !callbackRegistered) {
-            try {
-                if (Build.VERSION.SDK_INT >= 24) cm.registerDefaultNetworkCallback(networkCallback);
-                else cm.registerNetworkCallback(new NetworkRequest.Builder()
-                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), networkCallback);
-                callbackRegistered = true;
-            } catch (RuntimeException ignored) { /* Connectivity is only a local status hint. */ }
-        }
         if (dirty) refresh();
     }
 
     @Override protected void onPause() {
         resumed = false;
         pendingGridPosition = RecyclerView.NO_POSITION;
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        if (cm != null && callbackRegistered) {
-            cm.unregisterNetworkCallback(networkCallback);
-            callbackRegistered = false;
-        }
         super.onPause();
     }
 
@@ -493,17 +466,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 } else openSettings(Settings.ACTION_SETTINGS);
             }
         }).show();
-    }
-
-    private void updateNetwork() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        Network active = cm == null ? null : cm.getActiveNetwork();
-        NetworkCapabilities capabilities = active == null ? null : cm.getNetworkCapabilities(active);
-        boolean connected = capabilities != null
-                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
-        network.setAlpha(connected ? 1f : 0.55f);
-        network.setContentDescription(getString(R.string.network) + ": "
-                + getString(connected ? R.string.connected : R.string.offline));
     }
 
     private void updateHero() {
