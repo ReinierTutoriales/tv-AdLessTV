@@ -127,7 +127,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         heroOpen.setOnKeyListener((v, key, event) -> heroKey(key, event));
         heroInfo.setOnKeyListener((v, key, event) -> heroKey(key, event));
         if (Build.VERSION.SDK_INT >= 33) {
-            backCallback = () -> settings.requestFocus();
+            backCallback = () -> {
+                pendingGridPosition = RecyclerView.NO_POSITION;
+                settings.requestFocus();
+            };
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
@@ -176,9 +179,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                     return true;
                 }
                 return false;
-            });
-            actions[i].setOnFocusChangeListener((v, focused) -> {
-                if (focused) pendingGridPosition = RecyclerView.NO_POSITION;
             });
         }
         IntentFilter packages = new IntentFilter();
@@ -356,7 +356,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         else return false;
         int from = pendingGridPosition >= 0 ? pendingGridPosition : position;
         int next = adapter.move(from, direction);
-        if (next == GridNavigation.TOP_BAR) inputs.requestFocus();
+        if (next == GridNavigation.TOP_BAR) {
+            pendingGridPosition = RecyclerView.NO_POSITION;
+            inputs.requestFocus();
+        }
         else if (next != from) focusGrid(next);
         return true;
     }
@@ -549,6 +552,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     // Android 13+ uses OnBackInvokedCallback; older TV versions still dispatch here.
     @SuppressLint("GestureBackNavigation")
     @Override public void onBackPressed() {
+        pendingGridPosition = RecyclerView.NO_POSITION;
         settings.requestFocus();
     }
 }
