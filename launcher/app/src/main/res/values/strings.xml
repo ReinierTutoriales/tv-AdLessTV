@@ -26,6 +26,8 @@
     <string name="loading_apps">Cargando aplicaciones…</string>
     <string name="scan_failed">No se pudieron leer las aplicaciones. Vuelve a abrir el inicio para reintentar.</string>
     <string name="app_details">Información de la aplicación</string>
+    <string name="hero_hint">Selecciona una aplicación para abrirla</string>
+    <string name="open_app">Abrir</string>
     <string name="default_home">Elegir aplicación de inicio</string>
     <string name="already_home">AdLessTV ya es tu aplicación de inicio.</string>
     <string name="home_role_not_selected">El sistema concedió el rol de inicio, pero sigue abriendo otro lanzador. Comprueba la aplicación de inicio en Ajustes. Si el televisor impone su lanzador, la activación por ADB requiere revisar y respaldar el paquete exacto.</string>

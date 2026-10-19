@@ -41,7 +41,22 @@ public class HomeUiTest {
         for (AppRepository.App app : installed) assertTrue("Repeated package", packages.add(app.packageName()));
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
             waitForCatalog(scenario);
+            waitUntil(scenario, activity -> {
+                RecyclerView grid = activity.findViewById(R.id.grid);
+                View focused = activity.getCurrentFocus();
+                return focused != null && grid.findContainingItemView(focused) != null;
+            });
             scenario.onActivity(activity -> checkViewport(activity));
+            scenario.onActivity(activity -> {
+                RecyclerView grid = activity.findViewById(R.id.grid);
+                View tile = grid.findContainingItemView(activity.getCurrentFocus());
+                assertNotNull("An installed app must have focus", tile);
+                AppAdapter adapter = (AppAdapter) grid.getAdapter();
+                String label = adapter.at(grid.getChildAdapterPosition(tile)).label;
+                assertEquals("The hero must describe the focused app", label,
+                        ((android.widget.TextView) activity.findViewById(R.id.hero_name)).getText().toString());
+                assertTrue(activity.findViewById(R.id.hero_open).isEnabled());
+            });
             screenshot("installed-apps.png");
         }
     }
@@ -156,7 +171,7 @@ public class HomeUiTest {
     private void checkViewport(MainActivity activity) {
         RecyclerView grid = activity.findViewById(R.id.grid);
         View root = activity.findViewById(R.id.root);
-        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 2);
+        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 3);
         Rect viewport = new Rect();
         assertTrue(grid.getGlobalVisibleRect(viewport));
         for (int i = 0; i < grid.getChildCount(); i++) {

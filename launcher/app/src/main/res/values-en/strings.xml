@@ -26,6 +26,8 @@
     <string name="loading_apps">Loading apps…</string>
     <string name="scan_failed">Unable to read apps. Reopen home to try again.</string>
     <string name="app_details">App info</string>
+    <string name="hero_hint">Select an app to open it</string>
+    <string name="open_app">Open</string>
     <string name="default_home">Choose home app</string>
     <string name="already_home">AdLessTV is already your home app.</string>
     <string name="home_role_not_selected">The system granted the home role, but still opens another launcher. Check the home app in Settings. If the TV enforces its launcher, ADB activation requires reviewing and backing up the exact package.</string>

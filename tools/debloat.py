@@ -16,7 +16,7 @@ PACKAGE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+")
 COMPONENT = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)/[A-Za-z0-9_.$]+")
 STATES = {0: "default-state", 1: "enable", 2: "disable", 3: "disable-user", 4: "disable-until-used"}
 # No desactivar infraestructura básica aunque aparezca en una lista de ejemplo.
-CORE = {"android", "com.android.systemui", "com.android.settings", "com.android.shell",
+CORE = {"android", "com.android.systemui", "com.android.settings", "com.android.tv.settings", "com.android.shell",
         "com.android.packageinstaller", "com.google.android.packageinstaller",
         "com.google.android.gms", "com.android.vending", "com.google.android.gsf",
         "com.android.providers.settings", "com.android.networkstack",

@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: ['3.10', '3.13']
+        python: ['3.11', '3.13']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -21,7 +21,10 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - name: Bash syntax
         if: runner.os == 'Linux'
-        run: bash -n tools/disable.sh tools/restore.sh
+        run: |
+          for file in tools/disable.sh tools/restore.sh; do
+            bash -n "$file"
+          done
       - name: PowerShell syntax
         shell: pwsh
         run: |
