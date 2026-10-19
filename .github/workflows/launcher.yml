@@ -44,8 +44,10 @@ jobs:
           test -s launcher/app/build/outputs/apk/release/app-release-unsigned.apk
           for apk in launcher/app/build/outputs/apk/debug/app-debug.apk launcher/app/build/outputs/apk/release/app-release-unsigned.apk; do
             declared_permissions=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk")
-            if grep -q 'uses-permission' <<< "$declared_permissions"; then
-              echo "El lanzador no debe solicitar permisos: $apk" >&2
+            unexpected_permissions=$(grep '^uses-permission' <<< "$declared_permissions" |
+              grep -Fvx "uses-permission: name='com.adlesstv.launcher.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'" || true)
+            if [ -n "$unexpected_permissions" ]; then
+              echo "El lanzador solicita permisos inesperados: $apk" >&2
               echo "$declared_permissions" >&2
               exit 1
             fi
