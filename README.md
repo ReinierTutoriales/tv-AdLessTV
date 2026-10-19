@@ -45,6 +45,12 @@ export TV_HOST=192.168.1.50
 
 `TV_PORT` cambia el puerto (5555 por defecto). También puedes usar `--host` y `--port` antes de la operación. Las claves se guardan en `tools/adbkey/` y se reutilizan; no las publiques. Desactiva la depuración cuando termines.
 
+### Stick 4K con 2 GB de RAM y 8 GB de almacenamiento
+
+`--probe` muestra modelo, dispositivo, compilación, RAM detectada y espacio real de `/data`. La capacidad nominal de 8 GB incluye el sistema: utiliza el espacio libre detectado para decidir si cabe instalar el APK. El instalador borra su copia temporal de `/data/local/tmp` tras intentar la instalación. La interfaz carga imágenes locales bajo demanda en una caché de 2 o 4 MiB según la clasificación de RAM baja del propio Android; no descarga imágenes ni mantiene tareas periódicas.
+
+El stick normalmente no tiene puertos HDMI de **entrada** ni sintonizador, pero el software comprueba las entradas ofrecidas por Android antes de ocultar el acceso. Para el debloat usa un perfil del **modelo y fingerprint exactos**, y conserva mando, emparejamiento Bluetooth, Play Services/Store y las funciones que utilices. No se borran datos de apps ni cachés indiscriminadamente.
+
 ## Construcción e instalación del lanzador
 
 Requiere **JDK 17**, Android SDK **platform 36 / build-tools 36.0.0** y acceso a los repositorios Android/Gradle. Usa Gradle 9.8.1, Android Gradle Plugin 9.4.1, Java y AndroidX RecyclerView. Compila y apunta a Android 16 (API 36), con compatibilidad declarada desde API 23. Android 17 (API 37) ya se publicó, pero el `sdkmanager` del ejecutor de CI aún no encuentra `platforms;android-37`; no se declara compatibilidad comprobada con esa imagen. La CI comprueba Android 15 y Android TV 14; falta comprobar un televisor físico con firmware más reciente. Para crear el APK sin conectar una TV:
@@ -69,7 +75,7 @@ PYTHON=.venv/bin/python bash launcher/build-and-install.sh
 
 Para instalar y elegir HOME en una sola operación explícita, usa `--make-home backups/home-tv.json` en Bash o `-HomeSnapshot backups/home-tv.json` en PowerShell. El respaldo debe ser nuevo. Añade `--replace-stock <paquete-exacto>` o `-ReplaceStock <paquete-exacto>` solo tras revisar las otras funciones de ese paquete. Conserva el JSON y utiliza `tools/home.py --restore` para recuperar el inicio anterior.
 
-Confirma con el mando que abren tus apps, que vuelves al mismo favorito, que los botones responden y que las entradas funcionan en tu firmware. La pantalla de entradas depende de los servicios de TV que exponga el fabricante; si no hay una acción compatible, usa los ajustes de la TV.
+Confirma con el mando que abren tus apps, que vuelves al mismo favorito, que los botones responden y que las entradas funcionan en tu firmware. La pantalla de entradas depende de los servicios de TV que exponga el fabricante; si no hay una acción compatible, usa los ajustes de la TV. En un stick sin entradas de TV detectadas se oculta ese botón y la navegación del mando pasa directamente a los otros accesos.
 
 Para establecer AdLessTV como HOME, guarda primero el HOME anterior en un archivo **nuevo**:
 

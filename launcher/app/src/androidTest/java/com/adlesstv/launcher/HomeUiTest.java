@@ -7,6 +7,8 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ResolveInfo;
 import android.os.ParcelFileDescriptor;
 import android.graphics.Rect;
+import android.media.tv.TvInputInfo;
+import android.media.tv.TvInputManager;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.View;
@@ -48,6 +50,14 @@ public class HomeUiTest {
             });
             scenario.onActivity(activity -> checkViewport(activity));
             scenario.onActivity(activity -> {
+                TvInputManager manager = (TvInputManager) activity.getSystemService(Context.TV_INPUT_SERVICE);
+                boolean hasInput = false;
+                if (manager != null) for (TvInputInfo input : manager.getTvInputList()) {
+                    if (input.isPassthroughInput() || input.getType() == TvInputInfo.TYPE_TUNER)
+                        hasInput = true;
+                }
+                assertEquals("Only show a real TV input action", hasInput,
+                        activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE);
                 RecyclerView grid = activity.findViewById(R.id.grid);
                 View tile = grid.findContainingItemView(activity.getCurrentFocus());
                 assertNotNull("An installed app must have focus", tile);
@@ -109,7 +119,11 @@ public class HomeUiTest {
                     RecyclerView grid = activity.findViewById(R.id.grid);
                     View focused = activity.getCurrentFocus();
                     if (grid.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) return false;
-                    if (expected.get() == -1) return focused != null && focused.getId() == R.id.action_inputs;
+                    if (expected.get() == -1) {
+                        int firstAction = activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE
+                                ? R.id.action_inputs : R.id.action_network;
+                        return focused != null && focused.getId() == firstAction;
+                    }
                     View tile = focused == null ? null : grid.findContainingItemView(focused);
                     return tile != null && grid.getChildAdapterPosition(tile) == expected.get();
                 });

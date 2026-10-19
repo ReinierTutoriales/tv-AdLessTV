@@ -155,14 +155,13 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 if (key == KeyEvent.KEYCODE_DPAD_UP) return true;
                 if (key == KeyEvent.KEYCODE_DPAD_LEFT) {
                     int step = v.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL ? 1 : -1;
-                    actions[Math.max(0, Math.min(actions.length - 1, index + step))].requestFocus(); return true;
+                    focusVisibleAction(actions, index, step); return true;
                 }
                 if (key == KeyEvent.KEYCODE_DPAD_RIGHT) {
                     int step = v.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL ? -1 : 1;
-                    actions[Math.max(0, Math.min(actions.length - 1, index + step))].requestFocus(); return true;
+                    focusVisibleAction(actions, index, step); return true;
                 }
                 if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
-                    int selected = adapter.indexOf(lastFocused);
                     heroOpen.requestFocus();
                     return true;
                 }
@@ -204,6 +203,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
+        updateInputsVisibility();
         if (dirty) refresh();
     }
 
@@ -331,7 +331,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         int next = adapter.move(from, direction);
         if (next == GridNavigation.TOP_BAR) {
             pendingGridPosition = RecyclerView.NO_POSITION;
-            inputs.requestFocus();
+            firstTopAction().requestFocus();
         }
         else if (next != from) focusGrid(next);
         return true;
@@ -468,6 +468,32 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         }).show();
     }
 
+    private void updateInputsVisibility() {
+        TvInputManager manager = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
+        boolean hasInput = false;
+        if (manager != null) {
+            for (TvInputInfo info : manager.getTvInputList()) {
+                if (info.isPassthroughInput() || info.getType() == TvInputInfo.TYPE_TUNER) {
+                    hasInput = true;
+                    break;
+                }
+            }
+        }
+        if (!hasInput && inputs.hasFocus()) network.requestFocus();
+        inputs.setVisibility(hasInput ? View.VISIBLE : View.GONE);
+    }
+
+    private View firstTopAction() { return inputs.getVisibility() == View.VISIBLE ? inputs : network; }
+
+    private static void focusVisibleAction(View[] actions, int index, int step) {
+        for (int next = index + step; next >= 0 && next < actions.length; next += step) {
+            if (actions[next].getVisibility() == View.VISIBLE) {
+                actions[next].requestFocus();
+                return;
+            }
+        }
+    }
+
     private void updateHero() {
         heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
         heroOpen.setEnabled(selectedApp != null);
@@ -476,7 +502,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private boolean heroKey(int key, KeyEvent event) {
         if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-        if (key == KeyEvent.KEYCODE_DPAD_UP) { inputs.requestFocus(); return true; }
+        if (key == KeyEvent.KEYCODE_DPAD_UP) { firstTopAction().requestFocus(); return true; }
         if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
             int selected = adapter.indexOf(lastFocused);
             focusGrid(selected >= 0 ? selected : adapter.firstApp());
