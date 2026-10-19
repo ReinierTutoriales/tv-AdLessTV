@@ -122,7 +122,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (type == 0) {
             TextView label = new TextView(context);
             label.setTextColor(Color.rgb(162, 169, 182));
-            label.setTextSize(14);
+            label.setTextSize(16);
             label.setPadding(dp(context, 9), dp(context, 14), dp(context, 9), dp(context, 8));
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
@@ -207,7 +207,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             addView(icon, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
             label = new TextView(context);
             label.setTextColor(Color.rgb(240, 242, 247));
-            label.setTextSize(14);
+            label.setTextSize(16);
             label.setGravity(Gravity.CENTER);
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
