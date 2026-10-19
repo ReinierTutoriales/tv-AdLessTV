@@ -32,9 +32,9 @@ Usa este skill cuando el usuario trabaje en el repositorio AdLessTV, quiera limp
    - Protege HOME, teclados e infraestructura básica. No ejecutes operaciones simultáneas.
 
 4. **Lanzador**  
-   - Actualmente solo existe `launcher/config.xml.example`; no hay aplicación Android ni APK.
-   - Si se solicita implementarlo, sigue `docs/DISENO.md`: Java + AndroidX RecyclerView, sin red ni servicios permanentes.
-   - No cambies HOME ni desactives el lanzador de fábrica con estas herramientas.
+   - Compila con `bash launcher/build-and-install.sh --build-only` o el script PowerShell.
+   - Instala y abre una vista previa con `launcher/build-and-install.sh` o `.ps1`; valida navegación y retorno.
+   - Solo después, activa HOME con `tools/home.py --activate backups/home-nuevo.json`. Reinicia y comprueba con `--verify-reboot backups/home-nuevo.json`. Mantén el HOME anterior habilitado por defecto. Si se solicita desactivarlo, revisa el paquete y sus servicios; usa `--disable-stock` con `--stock-package` exacto, reinicia y verifica otra vez. Recupera con `--restore backups/home-nuevo.json`.
 
 5. **Restore**  
    Usa `tools/restore.sh backups/operacion-nueva.json`. Restaura los estados guardados de los paquetes intentados, también tras una desconexión. No recibe `debloat.txt`. El respaldo no contiene datos de usuario ni firmware.
@@ -53,22 +53,18 @@ bash tools/restore.sh backups/operacion-nueva.json
 
 ## Configuración del lanzador
 
-La configuración propuesta en `launcher/config.xml.example` no se aplica hasta implementar el lanzador:
-- `dock_apps`: las 4 apps del dock inferior (orden importa).
-- `hidden_apps`: apps que no deben aparecer en el grid.
-- `columns`: número de columnas.
-- `preferred_locale`: `es` por defecto.
+Los favoritos iniciales están en `launcher/app/src/main/res/values/config.xml`. Después se pueden cambiar desde la TV manteniendo OK sobre una app. Recupera aplicaciones ocultas y restablece favoritos desde Ajustes del lanzador. Los textos se localizan según el idioma del sistema.
 
 ## Integración con NF DNS VPN
 
-El proyecto está pensado para convivir con bloqueadores locales de DNS/VPN (como nfdnsvpn). El debloat elimina servicios de telemetría del fabricante; el VPN local limpia el resto a nivel de red. No mezcles ambos en el mismo proceso de instalación sin probar.
+El proyecto puede convivir con bloqueadores locales de DNS/VPN. El debloat desactiva paquetes seleccionados, pero la reducción de telemetría requiere medición de red antes y después. No mezcles ambos cambios en la misma prueba.
 
 ## Verificación
 
 Después de cambios importantes:
 - Inyecta teclas D-pad.
 - Saca capturas (`screencap`).
-- Confirma que Home sigue abriendo el lanzador existente.
+- Antes de activar, confirma que HOME sigue abriendo el lanzador existente; después confirma que abre AdLessTV y que `tools/home.py --restore` permite regresar.
 - Para cambios de código: ejecuta `python -m unittest discover -s tests -v`; no presentes pruebas simuladas como validación en TV.
 - Confirma que Inputs y apps principales siguen funcionando.
 

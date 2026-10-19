@@ -7,7 +7,7 @@ Pega este texto en un agente con acceso a shell y a tu red local.
 Quiero revisar mi Android TV / Google TV y reducir paquetes innecesarios de forma recuperable.
 Modelo y firmware: [ESCRIBE AQUÍ]. IP y puerto ADB: [ESCRIBE AQUÍ].
 
-Lee primero el código y el README. No anuncies funciones no implementadas: `launcher/` contiene solo un XML de ejemplo, no un lanzador compilable.
+Lee primero el código y el README. `launcher/` es un proyecto Android compilable; no afirmes que funciona en mi TV sin probarlo allí.
 
 ## Conexión e inventario
 
@@ -35,4 +35,4 @@ Lee primero el código y el README. No anuncies funciones no implementadas: `lau
 - Entrega la lista aplicada, la ruta del respaldo, los comandos de restauración y las pruebas reales realizadas.
 - Si no tienes acceso a la TV, declara esa limitación; las pruebas simuladas no demuestran compatibilidad física.
 
-Si después solicito construir un lanzador, impleméntalo como una tarea separada siguiendo `docs/DISENO.md`. Comprueba el APK sin sustituir el inicio de fábrica. No desactives el HOME original.
+Para el lanzador, construye e instala una vista previa. Comprueba foco D-pad, accesos y regreso desde aplicaciones. Solo tras verificar el APK en la TV, usa `tools/home.py --activate backups/home-nuevo.json`; reinicia y comprueba persistencia con `--verify-reboot`. Prueba la recuperación con `--restore`. La desactivación opcional del HOME anterior exige revisar los servicios del paquete, indicar su nombre exacto con `--disable-stock ... --stock-package <paquete>`, reiniciar otra vez y verificar de nuevo. Conserva siempre el respaldo. No afirmes persistencia ni compatibilidad sin prueba física.

@@ -9,3 +9,7 @@ launcher/app/build/
 .DS_Store
 backups/
 *.json.tmp
+launcher/.gradle/
+launcher/build/
+
+ui-results/

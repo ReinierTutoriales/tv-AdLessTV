@@ -39,6 +39,31 @@ def read_packages(path):
     return result
 
 
+def read_profile(path):
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if (not isinstance(data, dict) or data.get("version") != 1
+            or not isinstance(data.get("model"), str) or not data["model"].strip()
+            or not isinstance(data.get("firmware"), str) or not data["firmware"].strip()
+            or not isinstance(data.get("packages"), list) or not data["packages"]):
+        raise ValueError("Perfil inválido: requiere modelo, fingerprint de firmware y paquetes.")
+    names = set()
+    for entry in data["packages"]:
+        if (not isinstance(entry, dict) or not isinstance(entry.get("package"), str)
+                or not PACKAGE.fullmatch(entry["package"])
+                or not isinstance(entry.get("reason"), str) or not entry["reason"].strip()
+                or entry["package"] in names):
+            raise ValueError("Perfil inválido: cada paquete debe ser único y tener un motivo.")
+        names.add(entry["package"])
+    return data
+
+
+def check_profile(dev, profile):
+    model = shell(dev, "getprop ro.product.model").strip()
+    fingerprint = shell(dev, "getprop ro.build.fingerprint").strip()
+    if model != profile["model"] or fingerprint != profile["firmware"]:
+        raise ValueError("Perfil de otra TV o compilación; no se cambiarán paquetes.")
+
+
 def identity(dev):
     android_id = shell(dev, "settings --user 0 get secure android_id").strip()
     serial = shell(dev, "getprop ro.serialno").strip()
@@ -164,18 +189,22 @@ def main(argv=None):
     parser.add_argument("--port", type=int)
     sub = parser.add_subparsers(dest="action", required=True)
     disable = sub.add_parser("disable", help="Solo muestra el plan salvo que se indique --apply")
-    disable.add_argument("list", type=Path)
+    disable.add_argument("list", type=Path, nargs="?", help="Lista manual de paquetes")
+    disable.add_argument("--profile", type=Path, help="Perfil validado para modelo y firmware exactos")
     disable.add_argument("--apply", action="store_true")
     disable.add_argument("--snapshot", type=Path)
     undo = sub.add_parser("restore", help="Restaura un respaldo de una operación anterior")
     undo.add_argument("snapshot", type=Path)
     args = parser.parse_args(argv)
+    if args.action == "disable" and bool(args.list) == bool(args.profile):
+        parser.error("Indica exactamente una lista o --profile.")
     if args.action == "disable" and args.apply and not args.snapshot:
         parser.error("--apply requiere --snapshot con una ruta nueva para el respaldo.")
     dev = None
     try:
         if args.action == "disable":
-            packages = read_packages(args.list)
+            profile = read_profile(args.profile) if args.profile else None
+            packages = [entry["package"] for entry in profile["packages"]] if profile else read_packages(args.list)
             if args.apply and args.snapshot.exists():
                 raise ValueError("El respaldo ya existe. Usa una ruta nueva.")
         else:
@@ -185,10 +214,15 @@ def main(argv=None):
         if args.action == "restore":
             restore(dev, data, args.snapshot)
         else:
+            if profile:
+                check_profile(dev, profile)
             snapshot = plan(dev, packages)
+            reasons = {p["package"]: p["reason"] for p in profile["packages"]} if profile else {}
             for entry in snapshot["packages"]:
                 action = "sin cambio" if entry["state"] in (2, 3, 4) else "desactivar"
-                print(f"{entry['package']}: {STATES[entry['state']]} → {action}")
+                reason = reasons.get(entry["package"], "")
+                print(f"{entry['package']}: {STATES[entry['state']]} → {action}"
+                      + (f" ({reason})" if reason else ""))
             if args.apply:
                 apply(dev, snapshot, args.snapshot)
             else:
