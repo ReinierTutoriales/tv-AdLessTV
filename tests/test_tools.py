@@ -103,6 +103,8 @@ class Device:
             return 'serial-one'
         if command == 'getprop ro.product.model':
             return 'Test TV'
+        if command == 'getprop ro.build.fingerprint':
+            return 'brand/tv/build:1'
         if command.startswith('cmd package query-activities'):
             return 'com.test.home/.Home\ncom.other.launcher/.Home'
         if command == 'ime list -s':
@@ -147,6 +149,21 @@ class DebloatTests(unittest.TestCase):
             path.write_text(value, encoding='utf-8')
             with self.assertRaises(ValueError):
                 debloat.read_packages(path)
+
+    def test_profile_is_scoped_to_exact_firmware_and_requires_reasons(self):
+        path = Path(self.directory.name) / 'profile.json'
+        data = {'version': 1, 'model': 'Test TV', 'firmware': 'brand/tv/build:1',
+                'packages': [{'package': 'com.test.first', 'reason': 'Unused optional component'}]}
+        path.write_text(json.dumps(data), encoding='utf-8')
+        profile = debloat.read_profile(path)
+        debloat.check_profile(self.dev, profile)
+        self.assertEqual(self.dev.writes, [])
+        profile['firmware'] = 'other/build'
+        with self.assertRaisesRegex(ValueError, 'otra TV'):
+            debloat.check_profile(self.dev, profile)
+        data['packages'][0]['reason'] = ''
+        path.write_text(json.dumps(data), encoding='utf-8')
+        with self.assertRaises(ValueError): debloat.read_profile(path)
 
     def test_plan_is_read_only(self):
         snapshot = debloat.plan(self.dev, ['com.test.first'])

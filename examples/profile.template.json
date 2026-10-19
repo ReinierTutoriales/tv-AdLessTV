@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "model": "REEMPLAZAR_CON_getprop_ro.product.model",
+  "firmware": "REEMPLAZAR_CON_getprop_ro.build.fingerprint",
+  "packages": [
+    {
+      "package": "com.example.to_review",
+      "reason": "Describir la función comprobada en este firmware y por qué no se usa"
+    }
+  ]
+}

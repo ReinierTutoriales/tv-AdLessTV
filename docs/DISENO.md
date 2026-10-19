@@ -4,27 +4,53 @@
 
 Cliente ADB TCP en Python, lotes con comprobación del resultado, push/pull, simulación de debloat, protección de HOME/teclados/paquetes básicos y restauración con registro previo de cada intento. Bash y PowerShell usan el mismo motor para evitar divergencias.
 
+`tools/inventory.py` captura los paquetes instalados y desactivados del usuario 0 y puede comparar dos capturas de la misma identidad y compilación. Solo consulta ADB; no altera paquetes ni mide tráfico. Conserva el JSON localmente porque contiene identificadores de dispositivo.
+
 El respaldo conserva los estados Android 0 (default), 1 (enabled), 2 (disabled), 3 (disabled-user) y 4 (disabled-until-used). Solo se desactivan estados 0 y 1. Antes del primer cambio se valida la lista completa y se guarda un archivo nuevo con la identidad de la TV. Antes de enviar cada modificación se escribe `pending`; después de comprobarla se escribe `applied`. Tanto `pending` como `applied` pueden restaurarse. Los registros posteriores se reemplazan atómicamente. Un fallo detiene la operación y conserva el respaldo para recuperación manual.
 
 La restauración verifica la identidad y recupera únicamente los paquetes intentados. No supone que el lanzador stock tenga un nombre determinado y no modifica animaciones, HOME ni ajustes ajenos a la operación. El respaldo no incluye APKs, datos de usuario ni firmware. No ejecutar sesiones simultáneas; ante cambios posteriores hechos por otras herramientas, revisar el respaldo antes de restaurarlo.
 
-## Lanzador pendiente de implementar
+## Lanzador implementado
 
-Todavía no existen proyecto Gradle, fuentes Android, APK ni script de construcción. El XML de ejemplo documenta intenciones; no configura la TV por sí solo.
+Proyecto Java para Android TV (API 23+) con compilación y objetivo Android 16 (API 36), AGP 9.4.1 y AndroidX RecyclerView. Android 17 (API 37) ya se publicó, pero el `sdkmanager` usado por la CI no ofrece `platforms;android-37` en su canal actual (fallo reproducido en la ejecución 38). Antes de elevar el objetivo API hay que disponer del SDK y probar los cambios de comportamiento de Android 17, incluidos red local y redimensionamiento en pantallas grandes. La CI comprueba Android 15 y Android TV 14; la persistencia en firmware de TV reciente todavía requiere validación física. `AppRepository` descubre actividades instaladas y conserva favoritos ordenados y paquetes ocultos mediante preferencias locales. Las apps se consultan en un ejecutor al entrar por primera vez o al recibir cambios de paquetes; volver de una app conserva las vistas y el foco. Se muestra una entrada por paquete, priorizando actividades TV. `ArtworkLoader` carga banners e iconos en dos workers y produce imágenes de 320 × 180; su caché de bitmaps tiene un límite de 4 MiB (2 MiB en dispositivos low-RAM), sin almacenamiento en disco ni red. Cancela peticiones de vistas recicladas e invalida la caché al cambiar paquetes. No solicita permiso de Internet ni incorpora SDK de analítica.
 
-Conceptos seleccionados para el futuro lanzador, con implementación propia:
+`MainActivity` usa una cabecera compacta y un único RecyclerView desplazable para favoritos y aplicaciones. Las cabeceras de sección ocupan una fila completa; las tarjetas se miden dentro de cada columna y mantienen la proporción del arte. El número de columnas varía de 2 a 6 según el ancho. El recorrido D-pad salta cabeceras y ajusta la columna al bajar a una fila incompleta; el foco tiene borde visible y una escala breve. La interfaz usa superficies opacas, sin desenfoque ni vídeo de fondo. La app enfocada se recuerda por componente, se recupera tras volver y se revalida al cambiar las apps instaladas. Mantener OK permite fijar, ordenar, esconder o abrir información de la app; el menú de ajustes restaura paquetes ocultos, confirma el restablecimiento de favoritos y permite solicitar el rol HOME cuando el firmware lo ofrece. Los botones también responden al clic.
 
-1. Dock de favoritos y cuadrícula de aplicaciones, sin contenido patrocinado.
-2. Restaurar el foco por identidad de aplicación al volver desde otra app, incluso si cambia la lista.
-3. Recorridos D-pad explícitos entre botones, dock y cuadrícula; foco visible sin depender del color.
-4. Accesos a entradas, conectividad y ajustes, con alternativa si una acción no existe en ese firmware.
-5. Favoritos y aplicaciones ocultas editables desde la TV, sin reconstruir el APK.
-6. Trabajo de carga fuera del hilo de interfaz, vistas recicladas y caché acotada de iconos.
-7. Sin red, reproducción automática, blur ni servicios permanentes. Reloj activo solo mientras se ve la pantalla.
-8. Salvapantallas opcional con desplazamiento del reloj, después de estabilizar la navegación.
+Las entradas se enumeran mediante `TvInputManager`; Android o el fabricante pueden no proporcionar una actividad que abra una entrada. Se notifica el fallo y se ofrecen los ajustes. `ClockDream` es un salvapantallas opcional con reloj que cambia de posición mientras está activo.
 
-La elección de biblioteca y SDK se hará al implementar y medir el lanzador; no existe todavía evidencia de RAM, fluidez ni compatibilidad por modelo. Seguir las guías oficiales de [Android TV](https://developer.android.com/training/tv/get-started/create) y [navegación](https://developer.android.com/training/tv/get-started/navigation).
+El script de instalación compila, instala y abre una vista previa; `--make-home`/`-HomeSnapshot` permite seleccionar HOME con respaldo en la misma operación. `tools/home.py` activa HOME por separado, guarda el componente anterior y el identificador de arranque, y lo restaura solo en la misma TV. Una verificación posterior exige otro arranque y confirma que HOME persistió y está visible sin abrirlo desde el verificador. La desactivación opcional puede corregir una selección que el fabricante revirtió: exige el paquete anterior exacto, un preflight de apertura y un diario previo; la restauración reactiva el paquete antes de cambiar HOME. Antes de confirmar activación, reemplazo o restauración se espera la escritura diferida de PackageManager (AOSP la agrupa con 10 segundos de demora), se esperan sus handlers cuando el comando existe y se sincroniza el almacenamiento. Esta espera acotada ocurre en la herramienta de configuración, no en el lanzador. Esto no garantiza que un firmware OEM no revierta la selección en un futuro reinicio. El debloat usa su propio respaldo; los dos archivos no deben intercambiarse.
+
+`tools/debloat.py disable --profile archivo.json` admite perfiles de modelo y fingerprint exactos con motivo por paquete. Sigue simulando salvo `--apply --snapshot`. No hay perfiles certificados sin prueba física; `examples/profile.template.json` es solo un esquema ilustrativo.
+
+La UI comprueba la actividad que resuelve el intent HOME antes de decir que AdLessTV es el inicio efectivo: poseer `ROLE_HOME` puede no bastar en determinadas imágenes de TV. La activación normal por ADB restaura el rol anterior si otro HOME sigue resolviéndose; solo la operación opcional con paquete exacto puede desactivar el anterior, con respaldo y restauración. La espera de 12 segundos cubre la demora de 10 segundos observada en AOSP, pero no ofrece una garantía contractual para todos los fabricantes.
+
+Referencias oficiales: [RoleManager / ROLE_HOME](https://developer.android.com/reference/android/app/role/RoleManager), [Direct Boot](https://developer.android.com/privacy-and-security/direct-boot), [AOSP PackageManagerService / WRITE_SETTINGS_DELAY](https://android.googlesource.com/platform/frameworks/base/+/android17-release/services/core/java/com/android/server/pm/PackageManagerService.java), [AOSP CTS / prioridad de HOME en TV](https://android.googlesource.com/platform/cts/+/c0e975a9eff/hostsidetests/devicepolicy/src/com/android/cts/devicepolicy/OrgOwnedProfileOwnerTest.java).
+
+Versiones y comportamiento: [Android 17 SDK](https://developer.android.com/about/versions/17/setup-sdk), [cambios al apuntar a API 37](https://developer.android.com/about/versions/17/behavior-changes-17), [compatibilidad AGP 9.4](https://developer.android.com/build/releases/agp-9-4-0-release-notes).
+
+## Límites conocidos
+
+- Sin pruebas físicas aún en firmware específico; validar mando, conexiones HDMI/TV y regreso desde apps.
+- La lista de entradas depende de la API y aplicaciones del fabricante.
+- La enumeración y carga de iconos depende de los paquetes instalados; falta medir arranque y memoria en TVs con 1 GB.
+- La selección del salvapantallas puede no estar expuesta en algunas TVs.
+- El banner tiene el nombre de la aplicación en un recurso xhdpi de 320 × 180 píxeles; antes de publicar en una tienda, verificar sus requisitos de ficha y activos.
+
+## Objetivo de privacidad y criterios de aceptación
+
+La ausencia del permiso `INTERNET` y de SDKs de analítica es una propiedad verificable del APK del lanzador; no equivale a eliminar la telemetría del sistema, de las apps conservadas o del fabricante. La desactivación de paquetes reduce componentes seleccionados en el usuario 0, sin interceptar tráfico, desinstalarlos ni demostrar por sí misma una reducción de conexiones.
+
+Para cada firmware que se quiera declarar compatible:
+
+1. Registrar modelo, versión de Android y compilación, paquetes habilitados y HOME actual. Identificar por función y dependencias cada candidato; conservar servicios necesarios para reproducción, entradas, teclado, actualizaciones y recuperación según las preferencias del dueño.
+2. Medir en la misma red el tráfico saliente de esa TV antes del cambio, durante un intervalo y tareas reproducibles; registrar duración, fecha, dominios/IP y método de captura. Evitar asociar cada conexión a un paquete sin evidencia adicional.
+3. Simular el plan, guardar un respaldo nuevo, aplicar los cambios y verificar uno a uno sus estados. Repetir la misma medición y los mismos usos con las apps elegidas; documentar conexiones que persisten y posibles interrupciones funcionales.
+4. Verificar el botón HOME, mando, apps, HDMI, Wi-Fi, suspensión, reinicio y restauración con el respaldo en el mismo dispositivo. Repetir la medición si cambia el firmware, las apps o la configuración de red.
+
+Publicar el perfil de ese modelo solo con resultados observados y límites de la captura. El criterio «telemetría eliminada» requiere evidencia de ausencia en el alcance medido; no extrapolarlo a todos los modelos ni prometer ausencia permanente. El criterio de rendimiento requiere medir arranque en frío, memoria y respuesta del mando en TV real antes de proclamar mejoras cuantificables.
 
 ## Validación
 
-Las herramientas tienen regresiones en Linux y Windows. Pendiente: conexión, lectura de estados, aplicación y restauración sobre firmware real. Para el futuro lanzador: pruebas de navegación en emulador, instalación sin sustituir HOME, mediciones de arranque/memoria y prueba con mando en TV antes de proponer cualquier cambio de inicio.
+Las herramientas tienen regresiones en Linux y Windows. Pendiente: conexión, lectura de estados, aplicación y restauración sobre firmware real. Para el lanzador: la CI compila debug y release, ejecuta Android Lint y comprueba que el APK no solicite Internet; la tarea de emulador prueba tamaños 960 × 540 y 720 × 480 con fuente ampliada, nombres largos, cambios de sección y visibilidad del foco. Guarda capturas de apps instaladas y de un catálogo artificial de prueba. Faltan pruebas en TV física, mediciones comparables de arranque/memoria y validación de entradas por fabricante.
+
+El Activity HOME es `singleTask` y Direct-Boot aware. Desde API 24, sus preferencias locales se guardan en almacenamiento protegido del dispositivo y migran las elecciones anteriores después de desbloquear. No usa un servicio permanente ni un receptor de arranque que intente eludir las restricciones de actividades en segundo plano. La CI de emulador selecciona HOME, reinicia, comprueba que aparece solo, desactiva el HOME anterior, repite el reinicio y restaura. Un firmware de TV que imponga otra actividad al arrancar requiere validación específica.

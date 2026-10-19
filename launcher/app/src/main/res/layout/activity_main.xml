@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:paddingStart="48dp" android:paddingEnd="48dp"
+    android:paddingTop="27dp" android:paddingBottom="27dp">
+    <RelativeLayout android:id="@+id/top_bar" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp">
+        <LinearLayout android:id="@+id/actions" android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:orientation="horizontal">
+            <ImageButton android:id="@+id/action_inputs" style="@style/ActionPill"
+                android:src="@drawable/ic_inputs" android:contentDescription="@string/inputs" />
+            <ImageButton android:id="@+id/action_network" style="@style/ActionPill"
+                android:src="@drawable/ic_network" android:contentDescription="@string/network" />
+            <ImageButton android:id="@+id/action_settings" style="@style/ActionPill"
+                android:src="@drawable/ic_settings" android:contentDescription="@string/settings" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_centerVertical="true"
+            android:layout_toStartOf="@id/actions" android:layout_marginEnd="16dp" android:gravity="center_vertical"
+            android:orientation="vertical">
+            <TextClock android:id="@+id/clock" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:format12Hour="h:mm a" android:format24Hour="HH:mm" android:maxLines="1"
+                android:ellipsize="end" android:includeFontPadding="false" android:textColor="#F4F5F8"
+                android:textSize="30sp" android:fontFamily="sans-serif-light" />
+            <TextClock android:id="@+id/date" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:format12Hour="EEE, MMM d" android:format24Hour="EEE, MMM d"
+                android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end"
+                android:textColor="#A2A9B6" android:textSize="13sp" />
+        </LinearLayout>
+    </RelativeLayout>
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/grid" android:layout_width="match_parent"
+            android:layout_height="match_parent" android:clipToPadding="false" android:clipChildren="false"
+            android:padding="6dp" android:scrollbars="none" android:overScrollMode="never"
+            android:descendantFocusability="afterDescendants" />
+        <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:gravity="center" android:text="@string/loading_apps" android:textColor="#A2A9B6"
+            android:textSize="18sp" android:padding="16dp" />
+    </FrameLayout>
+    <TextView android:layout_width="match_parent" android:layout_height="24dp" android:gravity="center_vertical"
+        android:text="@string/long_press_hint" android:textColor="#798291" android:textSize="12sp"
+        android:maxLines="1" android:ellipsize="end" android:paddingStart="12dp" android:paddingEnd="12dp" />
+</LinearLayout>

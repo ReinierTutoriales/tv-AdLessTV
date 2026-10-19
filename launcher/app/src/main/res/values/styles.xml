@@ -1,0 +1,22 @@
+<resources>
+    <style name="Theme.AdLessTV" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#D8E3F2</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#090B10</item>
+        <item name="android:navigationBarColor">#090B10</item>
+        <item name="android:statusBarColor">#090B10</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="ActionPill">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:padding">11dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:focusable">true</item>
+        <item name="android:focusableInTouchMode">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:background">@drawable/focus_action</item>
+    </style>
+</resources>

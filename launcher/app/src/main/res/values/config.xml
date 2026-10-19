@@ -1,0 +1,9 @@
+<resources>
+    <!-- Initial favorites; after the user edits them on TV, their choice takes precedence. -->
+    <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>com.plexapp.android</item>
+    </string-array>
+</resources>

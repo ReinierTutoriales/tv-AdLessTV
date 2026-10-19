@@ -26,7 +26,7 @@ python3 tools/debloat.py restore backups/operacion-nueva.json
 ```
 
 ## Pantalla
-El lanzador propio no está implementado. No cambies HOME.
+Compila e instala una vista previa antes de cambiar HOME. Conserva el respaldo para volver al lanzador anterior.
 
 ```bash
 # Captura de pantalla
@@ -38,4 +38,14 @@ python3 tools/tv.py --pull /sdcard/s.png s.png
 ```bash
 python3 tools/tv.py 'input keyevent KEYCODE_HOME'
 python3 tools/tv.py 'input keyevent KEYCODE_DPAD_DOWN'
+```
+
+## Activar y recuperar HOME
+```bash
+python3 tools/home.py --activate backups/home-nuevo.json
+python3 tools/home.py --verify-reboot backups/home-nuevo.json
+# Opcional, tras revisar funciones del paquete:
+python3 tools/home.py --disable-stock backups/home-nuevo.json --stock-package com.fabricante.home
+# Reiniciar y ejecutar --verify-reboot otra vez.
+python3 tools/home.py --restore backups/home-nuevo.json
 ```
