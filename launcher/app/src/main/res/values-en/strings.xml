@@ -5,8 +5,8 @@
     <string name="inputs">Inputs</string>
     <string name="network">Network</string>
     <string name="settings">Settings</string>
-    <string name="connected">Connected</string>
-    <string name="offline">Offline</string>
+    <string name="connected">Internet available</string>
+    <string name="offline">Internet not validated</string>
     <string name="pin">Add to favorites</string>
     <string name="unpin">Remove from favorites</string>
     <string name="move_left">Move left</string>
