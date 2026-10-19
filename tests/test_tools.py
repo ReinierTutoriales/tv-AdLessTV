@@ -96,6 +96,7 @@ class Device:
         self.device_id = 'tv-one'
         self.on_write = lambda: None
         self.current_user = '0'
+        self.firmware = 'brand/tv/build:1'
         self.tv_input = 'com.test.input/.Input'
         self.accessibility = 'null'
         self.vpn = 'null'
@@ -110,7 +111,7 @@ class Device:
         if command == 'getprop ro.product.model':
             return 'Test TV'
         if command == 'getprop ro.build.fingerprint':
-            return 'brand/tv/build:1'
+            return self.firmware
         if command.startswith('cmd package query-activities'):
             return 'com.test.home/.Home\ncom.other.launcher/.Home'
         if command == 'ime list -s':
@@ -186,7 +187,8 @@ class DebloatTests(unittest.TestCase):
     def test_protects_all_homes_keyboards_and_core(self):
         for package in ('com.test.home', 'com.other.launcher', 'com.test.keyboard',
                         'com.android.systemui', 'com.android.tv.settings',
-                        'com.adlesstv.launcher', 'com.android.bluetooth', 'com.test.input'):
+                        'com.adlesstv.launcher', 'com.android.bluetooth', 'com.android.providers.tv',
+                        'com.test.input'):
             with self.assertRaisesRegex(ValueError, 'protegidos'):
                 debloat.plan(self.dev, [package])
         self.assertEqual(self.dev.writes, [])
@@ -220,6 +222,51 @@ class DebloatTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'protección'):
             debloat.apply(self.dev, snapshot, self.path)
         self.assertEqual(self.dev.writes, [])
+
+    def test_later_entry_drift_blocks_whole_batch_and_firmware_is_recorded(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
+        self.assertEqual(snapshot['firmware'], self.dev.firmware)
+        self.dev.states['com.test.second'] = 0
+        with self.assertRaisesRegex(ValueError, 'com.test.second'):
+            debloat.apply(self.dev, snapshot, self.path)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.dev.writes, [])
+
+    def test_firmware_change_blocks_apply_or_verify_but_not_recovery(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first'])
+        self.dev.firmware = 'brand/tv/build:2'
+        with self.assertRaisesRegex(ValueError, 'firmware'):
+            debloat.apply(self.dev, snapshot, self.path)
+        self.assertFalse(self.path.exists())
+        self.dev.firmware = snapshot['firmware']
+        debloat.apply(self.dev, snapshot, self.path)
+        self.dev.firmware = 'brand/tv/build:2'
+        with self.assertRaisesRegex(ValueError, 'firmware'):
+            debloat.verify(self.dev, json.loads(self.path.read_text()))
+        debloat.restore(self.dev, json.loads(self.path.read_text()), self.path)
+        self.assertEqual(self.dev.states['com.test.first'], 0)
+
+    def test_user_or_role_change_mid_batch_stops_before_second_change(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
+        def switched_user():
+            self.dev.current_user = '10'
+        self.dev.on_write = switched_user
+        with self.assertRaisesRegex(ValueError, 'usuario visible'):
+            debloat.apply(self.dev, snapshot, self.path)
+        self.assertEqual(len(self.dev.writes), 1)
+        self.dev.current_user = '0'
+        debloat.restore(self.dev, json.loads(self.path.read_text()), self.path)
+        self.assertEqual(self.dev.states['com.test.first'], 0)
+
+    def test_newly_protected_package_stops_batch_and_can_restore(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
+        self.dev.on_write = lambda: setattr(self.dev, 'vpn', 'com.test.second')
+        with self.assertRaisesRegex(ValueError, 'función protegida'):
+            debloat.apply(self.dev, snapshot, self.path)
+        self.assertEqual(len(self.dev.writes), 1)
+        self.assertEqual(self.dev.states['com.test.second'], 1)
+        debloat.restore(self.dev, json.loads(self.path.read_text()), self.path)
+        self.assertEqual(self.dev.states['com.test.first'], 0)
 
     def test_verify_after_reboot_detects_reenabled_or_pending_packages(self):
         snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
