@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import home
+import debloat
 
 
 class Device:
@@ -20,11 +21,18 @@ class Device:
         self.boot = '11111111-1111-1111-1111-111111111111'
         self.stock_state = 0
         self.foreground = self.current
+        self.current_user = '0'
+        self.extra_home = None
 
     def shell(self, command):
         self.commands.append(command)
+        if command == 'am get-current-user': return self.current_user
         if command in ("sleep 12", "sync", "cmd package help 2>&1 || true"): return ""
         if command == home.RESOLVE: return f'priority=0\n{self.current}\n'
+        if command == home.QUERY_HOME:
+            claimants = ['com.factory.home/.Home', home.NEW_HOME]
+            if self.extra_home: claimants.append(self.extra_home)
+            return '\n'.join(claimants)
         if command == 'cat /proc/sys/kernel/random/boot_id': return self.boot
         if command.startswith('pm path '): return 'package:/data/app/app.apk\n'
         if command.startswith('am start -W '):
@@ -52,6 +60,7 @@ class HomeTests(unittest.TestCase):
         self.path = Path(self.tmp.name) / 'home.json'
         self.dev = Device()
         calls = [patch.object(home, 'shell', side_effect=lambda dev, cmd: dev.shell(cmd)),
+                 patch.object(debloat, 'shell', side_effect=lambda dev, cmd: dev.shell(cmd)),
                  patch.object(home, 'identity', side_effect=lambda dev: dev.ident),
                  patch.object(home, 'package_state', side_effect=lambda dev, package: dev.stock_state)]
         for call in calls:
@@ -198,6 +207,28 @@ class HomeTests(unittest.TestCase):
                 home.activate(self.dev, self.path)
         self.assertEqual(self.dev.current, 'com.factory.home/.Home')
         self.assertFalse(self.path.exists())
+
+    def test_home_activation_rejects_nonzero_foreground_user(self):
+        self.dev.current_user = '10'
+        with self.assertRaisesRegex(ValueError, 'usuario visible'):
+            home.activate(self.dev, self.path)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.dev.current, 'com.factory.home/.Home')
+
+    def test_other_home_claimant_blocks_stock_disable_before_snapshot(self):
+        self.dev.extra_home = 'com.vendor.setup/.RecoveryActivity'
+        with self.assertRaisesRegex(ValueError, 'com.vendor.setup'):
+            home.activate(self.dev, self.path, 'com.factory.home')
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.dev.stock_state, 0)
+        self.assertFalse(any(c.startswith('pm disable-user') for c in self.dev.commands))
+
+    def test_new_home_claimant_after_activation_blocks_optional_disable(self):
+        with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path)
+        self.dev.extra_home = 'com.vendor.setup/.RecoveryActivity'
+        with self.assertRaisesRegex(ValueError, 'com.vendor.setup'):
+            home.disable_stock(self.dev, self.path, 'com.factory.home')
+        self.assertEqual(self.dev.stock_state, 0)
 
     def test_restore_rejects_wrong_device_or_manual_change(self):
         with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path)

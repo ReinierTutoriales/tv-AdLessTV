@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import sys
 
-from debloat import identity
+from debloat import identity, protected_packages, require_user_zero
 from tv import connect, shell
 
 PACKAGE_LINE = re.compile(r"package:([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)")
@@ -24,15 +24,24 @@ def packages(output):
     return result
 
 
-def capture(device):
+def capture(device, review=False):
     installed = packages(shell(device, "pm list packages --user 0"))
     disabled = packages(shell(device, "pm list packages -d --user 0"))
     if not installed or not disabled.issubset(installed):
         raise ValueError("Inventario incompleto o incoherente; no se guardará.")
-    return {"version": 1, "user": 0, "device": identity(device),
+    result = {"version": 1, "user": 0, "device": identity(device),
             "firmware": shell(device, "getprop ro.build.fingerprint").strip(),
             "captured_at": datetime.now(timezone.utc).isoformat(),
             "installed": sorted(installed), "disabled": sorted(disabled)}
+    if review:
+        require_user_zero(device)
+        system = packages(shell(device, "pm list packages -s --user 0"))
+        if not system or not system.issubset(installed):
+            raise ValueError("Inventario de paquetes de sistema incompleto; no se guardará.")
+        protected = protected_packages(device) & installed
+        result["review"] = {"protected": sorted(protected),
+                            "system_to_review": sorted(system - disabled - protected)}
+    return result
 
 
 def validate(data):
@@ -69,6 +78,7 @@ def main(argv=None):
     parser.add_argument("--port", type=int)
     parser.add_argument("--output", type=Path, required=True, help="JSON nuevo; no se sobrescribe")
     parser.add_argument("--compare", type=Path, help="JSON previo de la misma TV y firmware")
+    parser.add_argument("--review", action="store_true", help="Enumera paquetes de sistema para revisión manual, sin sugerir desactivarlos")
     args = parser.parse_args(argv)
     device = None
     try:
@@ -79,7 +89,7 @@ def main(argv=None):
             before = json.loads(args.compare.read_text(encoding="utf-8"))
             validate(before)
         device = connect(args.host, args.port)
-        after = capture(device)
+        after = capture(device, review=args.review)
         differences = compare(before, after) if before else None
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("x", encoding="utf-8") as stream:
@@ -87,6 +97,10 @@ def main(argv=None):
             stream.write("\n")
         print(f"Inventario guardado: {args.output}; instalados: {len(after['installed'])}; "
               f"desactivados: {len(after['disabled'])}")
+        if args.review:
+            print("Paquetes de sistema habilitados para revisar manualmente (NO es una lista segura para desactivar):")
+            for package in after["review"]["system_to_review"]:
+                print("  " + package)
         if differences is not None:
             for key, values in differences.items():
                 print(f"{key} ({len(values)}): {', '.join(values) if values else 'ninguno'}")

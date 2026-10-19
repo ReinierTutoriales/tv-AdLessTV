@@ -11,14 +11,14 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 - Inicio adaptable: una cuadrícula desplazable con favoritos al principio, tarjetas con proporción fija, reloj y accesos compactos; D-pad y clic del mando.
 - Mantener OK o pulsar Menú sobre una app para añadir/quitar favorito, moverlo a izquierda o derecha u ocultarla; ajustes del lanzador para recuperar apps ocultas y restablecer favoritos.
 - Recuperación del foco por identidad al volver de una aplicación, sin volver a consultar todos los paquetes ni reconstruir el inicio.
-- Accesos a entradas, estado de conectividad y ajustes; salvapantallas de reloj opcional.
+- Accesos a entradas, ajustes de Wi-Fi y ajustes del sistema; salvapantallas de reloj opcional.
 - Conexión ADB desde Python, sin instalar el ejecutable `adb`.
 - Comandos y lotes con comprobación de salida: se detienen ante el primer fallo.
 - Envío y recepción de archivos mediante `--push` y `--pull`.
 - Debloat en modo simulación por defecto; ningún paquete cambia sin `--apply`.
 - Respaldo del estado individual de los paquetes antes de modificarlos.
 - Restauración de los estados originales, incluidos `default` y `enabled`; los paquetes previamente desactivados se conservan.
-- Protección de los lanzadores HOME detectados, teclados e infraestructura básica.
+- Protección de los lanzadores HOME detectados, teclados, entradas de TV, servicios de accesibilidad activos, VPN permanente e infraestructura básica.
 - Scripts para Bash y Windows PowerShell, pruebas automáticas en Linux y Windows.
 
 ## Preparación
@@ -73,6 +73,16 @@ Confirma con el mando que abren tus apps, que vuelves al mismo favorito, que los
 
 Para establecer AdLessTV como HOME, guarda primero el HOME anterior en un archivo **nuevo**:
 
+Antes, comprueba qué otras actividades también reclaman HOME; una pantalla de configuración o recuperación puede tomar el control cuando desactives el lanzador de fábrica:
+
+```bash
+.venv/bin/python tools/home.py --inspect
+```
+
+El reemplazo del HOME de fábrica se detiene si aparece otra actividad además del HOME anterior y AdLessTV. Inspecciona esa actividad y sus funciones en **tu firmware**; no se desactiva automáticamente un asistente de configuración por su nombre.
+
+La activación exige que la sesión visible de la TV sea el usuario 0; en equipos con otro usuario activo no se cambia HOME hasta adaptar y probar el flujo para ese usuario.
+
 ```bash
 mkdir -p backups
 .venv/bin/python tools/home.py --activate backups/home-tv.json
@@ -113,11 +123,13 @@ Antes de modificar paquetes, guarda un inventario de solo lectura; al terminar, 
 ```bash
 mkdir -p backups
 .venv/bin/python tools/inventory.py --output backups/antes.json
+# Vista de paquetes del sistema que requieren revisión individual; no cambia la TV:
+.venv/bin/python tools/inventory.py --review --output backups/revision.json
 # Tras aplicar el plan de paquetes:
 .venv/bin/python tools/inventory.py --compare backups/antes.json --output backups/despues.json
 ```
 
-En Windows, utiliza `.\.venv\Scripts\python.exe` y `New-Item -ItemType Directory -Force backups`. El informe separa paquetes recién desactivados, reactivados, instalados y retirados; se detiene si la identidad o la compilación de firmware cambian. Los JSON contienen el identificador de la TV y el listado de paquetes: guárdalos localmente, no los publiques. **Este inventario no mide tráfico de red ni demuestra eliminación de telemetría.**
+En Windows, utiliza `.\.venv\Scripts\python.exe` y `New-Item -ItemType Directory -Force backups`. El informe separa paquetes recién desactivados, reactivados, instalados y retirados; se detiene si la identidad o la compilación de firmware cambian. `--review` separa paquetes protegidos de paquetes de sistema habilitados que requieren investigación: **no los considera seguros para desactivar ni infiere telemetría por el nombre**. Los JSON contienen el identificador de la TV y el listado de paquetes: guárdalos localmente, no los publiques. **Este inventario no mide tráfico de red ni demuestra eliminación de telemetría.**
 
 Crea una lista con un paquete por línea; admite comentarios `#`. Las listas de `examples/` son orientativas, no una certificación de seguridad para tu firmware. Para descubrir paquetes:
 
@@ -126,6 +138,8 @@ Crea una lista con un paquete por línea; admite comentarios `#`. Las listas de 
 ```
 
 Para un flujo repetible, copia `examples/profile.template.json`, indica el resultado exacto de `getprop ro.product.model` y `getprop ro.build.fingerprint`, y documenta el motivo de cada paquete. El perfil se rechaza si cambia el modelo o la compilación. El ejemplo contiene valores ficticios y nunca debe aplicarse tal cual:
+
+Revisa cada paquete de tu TV con `dumpsys package NOMBRE_DEL_PAQUETE`: busca sus actividades, servicios y permisos, comprueba si lo necesitan las entradas HDMI, el mando, los ajustes, las apps que utilizas o las actualizaciones y decide qué funciones conservar. Una lista de otro modelo es solo una pista de investigación. Elige paquetes de anuncios o recopilación de datos confirmados para **ese firmware**; la herramienta exige un motivo por paquete en el perfil y luego verifica estados y recuperación. El nombre del paquete por sí solo no demuestra su función ni elimina todo el tráfico del dispositivo.
 
 ```bash
 .venv/bin/python tools/tv.py 'getprop ro.product.model'
@@ -147,6 +161,12 @@ Después de revisar el plan, aplica con un archivo de respaldo **nuevo**:
 ```powershell
 New-Item -ItemType Directory -Force backups
 .\.venv\Scripts\python.exe tools/debloat.py disable mi-lista.txt --apply --snapshot backups/tv-01.json
+```
+
+Después de reiniciar la TV, comprueba sin modificar nada si el firmware conservó los estados:
+
+```powershell
+.\.venv\Scripts\python.exe tools/debloat.py verify backups/tv-01.json
 ```
 
 Para deshacer esa operación:
@@ -173,7 +193,7 @@ Cada paquete se verifica después del cambio. Si falla la conexión, se detiene 
 
 El respaldo solo restaura el estado habilitado/deshabilitado de los paquetes tocados, para el usuario 0 y la misma TV. **No es una copia completa del sistema ni de datos de aplicaciones.** No cambia el HOME, las animaciones, DNS, VPN, Chromecast ni ajustes de red. Evita operaciones de debloat simultáneas y restaura antes de introducir otros cambios manuales en esos paquetes: la restauración vuelve al estado guardado.
 
-Si no se pueden leer el estado de un paquete, los lanzadores, los teclados o la identidad de la TV, se cancela antes del primer cambio. La protección no identifica todas las dependencias de cada fabricante; selecciona solo paquetes cuyo propósito hayas comprobado.
+Si el usuario visible no es el 0 o no se pueden leer el estado de un paquete, los lanzadores, los teclados, los servicios de entrada, la accesibilidad activa, la VPN permanente o la identidad de la TV, se cancela antes del primer cambio. Una desactivación también se detiene si un paquete cambió desde la lectura previa. La protección no identifica todas las dependencias de cada fabricante; selecciona solo paquetes cuyo propósito hayas comprobado.
 
 ## Archivos y comandos
 

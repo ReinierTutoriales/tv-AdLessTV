@@ -16,10 +16,11 @@ PACKAGE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+")
 COMPONENT = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)/[A-Za-z0-9_.$]+")
 STATES = {0: "default-state", 1: "enable", 2: "disable", 3: "disable-user", 4: "disable-until-used"}
 # No desactivar infraestructura básica aunque aparezca en una lista de ejemplo.
-CORE = {"android", "com.android.systemui", "com.android.settings", "com.android.tv.settings", "com.android.shell",
+CORE = {"android", "com.adlesstv.launcher", "com.android.systemui", "com.android.settings", "com.android.tv.settings", "com.android.shell",
         "com.android.packageinstaller", "com.google.android.packageinstaller",
         "com.google.android.gms", "com.android.vending", "com.google.android.gsf",
-        "com.android.providers.settings", "com.android.networkstack",
+        "com.android.providers.settings", "com.android.providers.media", "com.android.externalstorage",
+        "com.android.inputdevices", "com.android.bluetooth", "com.android.networkstack",
         "com.google.android.networkstack", "com.android.permissioncontroller",
         "com.google.android.permissioncontroller"}
 
@@ -88,6 +89,13 @@ def package_state(dev, package):
     return int(enabled[1])
 
 
+def require_user_zero(dev):
+    current = shell(dev, "am get-current-user").strip()
+    if current != "0":
+        raise ValueError(f"El usuario visible es {current!r}; este flujo solo modifica el usuario 0."
+                         " No se aplicará un plan a otra sesión de TV.")
+
+
 def protected_packages(dev):
     homes = shell(dev, "cmd package query-activities --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME")
     home_packages = {match[1] for match in COMPONENT.finditer(homes)}
@@ -97,7 +105,16 @@ def protected_packages(dev):
     keyboard_packages = {match[1] for match in COMPONENT.finditer(keyboards)}
     if not keyboard_packages:
         raise ValueError("No se pudieron identificar los teclados; se cancela el debloat.")
-    return CORE | home_packages | keyboard_packages
+    inputs = shell(dev, "cmd package query-services --brief --user 0 -a android.media.tv.TvInputService")
+    input_packages = {match[1] for match in COMPONENT.finditer(inputs)}
+    accessibility = shell(dev, "settings --user 0 get secure enabled_accessibility_services").strip()
+    accessibility_packages = {match[1] for match in COMPONENT.finditer(accessibility)}
+    if accessibility.lower() not in ("", "null") and not accessibility_packages:
+        raise ValueError("No se pudieron interpretar los servicios de accesibilidad activos.")
+    vpn = shell(dev, "settings --user 0 get secure always_on_vpn_app").strip()
+    if vpn.lower() not in ("", "null") and not PACKAGE.fullmatch(vpn):
+        raise ValueError("No se pudo interpretar el paquete de VPN permanente.")
+    return CORE | home_packages | keyboard_packages | input_packages | accessibility_packages | ({vpn} if PACKAGE.fullmatch(vpn) else set())
 
 
 def write_snapshot(path, data):
@@ -117,6 +134,7 @@ def write_snapshot(path, data):
 
 
 def plan(dev, packages):
+    require_user_zero(dev)
     protected = protected_packages(dev)
     blocked = set(packages) & protected
     if blocked:
@@ -130,12 +148,19 @@ def plan(dev, packages):
 
 def apply(dev, snapshot, path):
     path = Path(path)
+    require_user_zero(dev)
+    blocked = {entry["package"] for entry in snapshot["packages"]} & protected_packages(dev)
+    if blocked:
+        raise ValueError("Cambió la protección de estos paquetes: " + ", ".join(sorted(blocked)))
     # Reserva exclusiva: nunca sobrescribir un respaldo de otra operación.
     with path.open("x", encoding="utf-8") as stream:
         json.dump(snapshot, stream, ensure_ascii=False, indent=2)
         stream.flush()
         os.fsync(stream.fileno())
     for entry in snapshot["packages"]:
+        if package_state(dev, entry["package"]) != entry["state"]:
+            raise ValueError(f"Cambió el estado de {entry['package']} desde la simulación. "
+                             "Conserva el respaldo y vuelve a planificar antes de seguir.")
         if entry["state"] in (2, 3, 4):
             print(f"Sin cambio (ya desactivado): {entry['package']}")
             continue
@@ -183,6 +208,29 @@ def restore(dev, data, path):
         print(f"Restaurado y verificado: {package} ({STATES[state]})")
 
 
+def verify(dev, data):
+    """Check package state without changing the TV, including after a reboot."""
+    validate_snapshot(data)
+    if identity(dev) != data["device"]:
+        raise ValueError("El respaldo pertenece a otra TV o a otro perfil.")
+    failures = []
+    for entry in data["packages"]:
+        if entry["status"] == "pending":
+            failures.append(f"{entry['package']}: cambio interrumpido; restaura el respaldo")
+            continue
+        expected = 3 if entry["status"] == "applied" else entry["state"]
+        try:
+            actual = package_state(dev, entry["package"])
+        except ValueError as exc:
+            failures.append(str(exc))
+            continue
+        if actual != expected:
+            failures.append(f"{entry['package']}: esperado {STATES[expected]}, actual {STATES[actual]}")
+    if failures:
+        raise ValueError("La TV no conserva el estado esperado:\n" + "\n".join(failures))
+    print(f"Verificados {len(data['packages'])} paquetes del respaldo; estados conservados.")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host")
@@ -195,6 +243,8 @@ def main(argv=None):
     disable.add_argument("--snapshot", type=Path)
     undo = sub.add_parser("restore", help="Restaura un respaldo de una operación anterior")
     undo.add_argument("snapshot", type=Path)
+    check = sub.add_parser("verify", help="Comprueba sin cambios el estado tras reiniciar")
+    check.add_argument("snapshot", type=Path)
     args = parser.parse_args(argv)
     if args.action == "disable" and bool(args.list) == bool(args.profile):
         parser.error("Indica exactamente una lista o --profile.")
@@ -213,6 +263,8 @@ def main(argv=None):
         dev = connect(args.host, args.port)
         if args.action == "restore":
             restore(dev, data, args.snapshot)
+        elif args.action == "verify":
+            verify(dev, data)
         else:
             if profile:
                 check_profile(dev, profile)

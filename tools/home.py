@@ -7,12 +7,13 @@ from pathlib import Path
 import re
 import sys
 
-from debloat import CORE, PACKAGE, identity, package_state, write_snapshot
+from debloat import CORE, PACKAGE, identity, package_state, require_user_zero, write_snapshot
 from tv import RemoteError, connect, shell
 
 NEW_HOME = "com.adlesstv.launcher/.MainActivity"
 COMPONENT = re.compile(r"[a-zA-Z_][\w.]*/[a-zA-Z_.$][\w.$]*")
 RESOLVE = "cmd package resolve-activity --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME -c android.intent.category.DEFAULT"
+QUERY_HOME = "cmd package query-activities --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME"
 BOOT_ID = re.compile(r"(?:[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|count:[0-9]+)")
 
 
@@ -75,6 +76,25 @@ def current_home(device):
     return canonical(candidates[0])
 
 
+def home_claimants(device):
+    """Read enabled HOME candidates before changing the preferred activity."""
+    output = shell(device, QUERY_HOME)
+    claimants = {canonical(match.group()) for match in COMPONENT.finditer(output)}
+    if not claimants:
+        raise ValueError("No se pudieron enumerar las actividades HOME de esta TV.")
+    return claimants
+
+
+def check_replacement_claimants(device, previous):
+    candidates = home_claimants(device)
+    if previous not in candidates or NEW_HOME not in candidates:
+        raise ValueError("El HOME anterior o AdLessTV no aparece entre las actividades HOME habilitadas.")
+    other = candidates - {previous, NEW_HOME}
+    if other:
+        raise ValueError("Otras actividades también reclaman HOME: " + ", ".join(sorted(other))
+                         + ". Revisa sus funciones y resuelve la competencia antes de desactivar el HOME anterior.")
+
+
 def settle_configuration(device):
     # AOSP batches package/preferred-activity writes with WRITE_SETTINGS_DELAY=10s.
     # Immediate ADB reboot can otherwise lose a change already visible in memory.
@@ -90,12 +110,15 @@ def settle_configuration(device):
 
 
 def activate(device, snapshot_path, stock_package=None):
+    require_user_zero(device)
     path = Path(snapshot_path)
     previous = current_home(device)
     if previous == NEW_HOME:
         raise ValueError("AdLessTV ya es HOME; conserva el respaldo de la activación anterior.")
     if stock_package is not None and (stock_package != previous.split("/", 1)[0] or stock_package in CORE):
         raise ValueError("Indica el paquete HOME anterior exacto y no protegido.")
+    if stock_package is not None:
+        check_replacement_claimants(device, previous)
     original_state = package_state(device, previous.split("/", 1)[0])
     if original_state not in (0, 1):
         raise ValueError("El HOME anterior no está habilitado; no se modificará.")
@@ -133,6 +156,7 @@ def activate(device, snapshot_path, stock_package=None):
 
 
 def verify_reboot(device, snapshot_path):
+    require_user_zero(device)
     path = Path(snapshot_path)
     data = read_snapshot(path, device)
     if data["version"] != 2 or data["status"] not in ("active", "reboot_verified",
@@ -156,6 +180,7 @@ def verify_reboot(device, snapshot_path):
 
 
 def disable_stock(device, snapshot_path, expected_package):
+    require_user_zero(device)
     path = Path(snapshot_path)
     data = read_snapshot(path, device)
     stock = data["previous"].split("/", 1)[0]
@@ -164,6 +189,7 @@ def disable_stock(device, snapshot_path, expected_package):
         raise ValueError("Se requiere una activación guardada y el paquete HOME exacto.")
     if current_home(device) not in (NEW_HOME, data["previous"]):
         raise ValueError("Se seleccionó un HOME diferente; no se reemplazará.")
+    check_replacement_claimants(device, data["previous"])
     if package_state(device, stock) != data["previous_state"]:
         raise ValueError("Cambió el estado del HOME anterior; no se desactivará.")
     if "Status: ok" not in shell(device, "am start -W -n " + NEW_HOME):
@@ -230,17 +256,24 @@ def main(argv=None):
     actions.add_argument("--verify-reboot", metavar="RESPALDO_JSON")
     actions.add_argument("--disable-stock", metavar="RESPALDO_JSON")
     actions.add_argument("--restore", metavar="RESPALDO_JSON")
+    actions.add_argument("--inspect", action="store_true", help="Muestra HOME actual y otras actividades que reclaman HOME")
     parser.add_argument("--stock-package", help="Paquete exacto del HOME de fábrica; solo con --disable-stock")
     args = parser.parse_args(argv)
     if (args.disable_stock and not args.stock_package) or (args.stock_package and not (args.activate or args.disable_stock)):
         parser.error("--stock-package solo acompaña --activate o --disable-stock; --disable-stock lo requiere.")
-    path = Path(args.activate or args.verify_reboot or args.disable_stock or args.restore)
+    path = Path(args.activate or args.verify_reboot or args.disable_stock or args.restore) if not args.inspect else None
     if args.activate and path.exists():
         parser.error("El respaldo ya existe. Conserva el anterior y usa una ruta nueva.")
     device = None
     try:
         device = connect(args.host, args.port)
-        if args.activate: activate(device, path, args.stock_package)
+        if args.inspect:
+            require_user_zero(device)
+            print("HOME actual:", current_home(device))
+            print("Actividades HOME habilitadas:")
+            for component in sorted(home_claimants(device)):
+                print("  " + component)
+        elif args.activate: activate(device, path, args.stock_package)
         elif args.verify_reboot: verify_reboot(device, path)
         elif args.disable_stock: disable_stock(device, path, args.stock_package)
         else: restore(device, path)
