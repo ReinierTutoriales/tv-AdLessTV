@@ -43,8 +43,10 @@ jobs:
           test -s launcher/app/build/outputs/apk/debug/app-debug.apk
           test -s launcher/app/build/outputs/apk/release/app-release-unsigned.apk
           for apk in launcher/app/build/outputs/apk/debug/app-debug.apk launcher/app/build/outputs/apk/release/app-release-unsigned.apk; do
-            if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -q 'android.permission.INTERNET'; then
-              echo 'El lanzador no debe solicitar acceso a Internet.' >&2
+            declared_permissions=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk")
+            if grep -q 'uses-permission' <<< "$declared_permissions"; then
+              echo "El lanzador no debe solicitar permisos: $apk" >&2
+              echo "$declared_permissions" >&2
               exit 1
             fi
           done
