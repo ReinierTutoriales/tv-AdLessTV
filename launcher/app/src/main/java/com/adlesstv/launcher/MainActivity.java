@@ -106,7 +106,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             });
         }
         repository = new AppRepository(this);
-        artwork = new ArtworkLoader(this);
+        artwork = new ArtworkLoader(this, app -> {
+            if (selectedApp != null && selectedApp.key().equals(app.key())) updateHero();
+        });
         grid = findViewById(R.id.grid);
         dock = findViewById(R.id.dock);
         empty = findViewById(R.id.empty);
@@ -485,6 +487,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                             repository.setVisualTheme(choice);
                             VisualTheme.apply(this, choice, findViewById(R.id.root),
                                     findViewById(R.id.hero), dock);
+                            updateHero();
                             dialog.dismiss();
                         })
                 .setNegativeButton(android.R.string.cancel, null).show();
@@ -590,6 +593,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
         heroOpen.setEnabled(selectedApp != null);
         heroInfo.setEnabled(selectedApp != null);
+        VisualTheme.applyAccent(this, repository.visualTheme(), findViewById(R.id.hero),
+                selectedApp == null ? 0 : artwork.accent(selectedApp));
     }
 
     private boolean heroKey(int key, KeyEvent event) {

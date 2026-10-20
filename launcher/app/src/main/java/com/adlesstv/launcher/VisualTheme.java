@@ -22,13 +22,30 @@ final class VisualTheme {
         int index = choice >= 0 && choice < COUNT ? choice : 0;
         root.setBackgroundColor(BACKGROUND[index]);
         int radius = AppAdapter.dp(context, 22);
-        GradientDrawable heroBackground = new GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT, HERO[index]);
-        heroBackground.setCornerRadius(radius);
-        hero.setBackground(heroBackground);
+        applyAccent(context, index, hero, 0);
         GradientDrawable dockBackground = new GradientDrawable();
         dockBackground.setColor(DOCK[index]);
         dockBackground.setCornerRadius(radius);
         dock.setBackground(dockBackground);
+    }
+
+    static void applyAccent(Context context, int choice, View hero, int accent) {
+        int index = choice >= 0 && choice < COUNT ? choice : 0;
+        int[] colors = HERO[index].clone();
+        if (accent != 0) {
+            colors[0] = mix(colors[0], accent, 24);
+            colors[1] = mix(colors[1], accent, 10);
+        }
+        GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT, colors);
+        background.setCornerRadius(AppAdapter.dp(context, 22));
+        hero.setBackground(background);
+    }
+
+    private static int mix(int base, int accent, int percent) {
+        return 0xFF000000
+                | (((((base >> 16) & 255) * (100 - percent) + ((accent >> 16) & 255) * percent) / 100) << 16)
+                | (((((base >> 8) & 255) * (100 - percent) + ((accent >> 8) & 255) * percent) / 100) << 8)
+                | ((((base & 255) * (100 - percent) + (accent & 255) * percent) / 100));
     }
 }
