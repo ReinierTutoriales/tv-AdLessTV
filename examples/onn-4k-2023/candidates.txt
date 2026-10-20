@@ -1,0 +1,5 @@
+# Punto de partida para onn 4K Streaming Box 2023 (YOC) únicamente.
+# Revisar modelo, compilación, función y paquetes activos antes de aplicar.
+# Esta lista NO incluye HOME, provisión, mando, Bluetooth, Cast, voz ni actualizaciones.
+com.google.android.feedback        # comentarios opcionales: revisar en el firmware real
+com.android.tv.feedbackconsent      # consentimiento de comentarios: revisar en el firmware real

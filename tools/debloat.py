@@ -23,7 +23,9 @@ CORE = {"android", "com.adlesstv.launcher", "com.android.systemui", "com.android
         "com.android.externalstorage",
         "com.android.inputdevices", "com.android.bluetooth", "com.android.networkstack",
         "com.google.android.networkstack", "com.android.permissioncontroller",
-        "com.google.android.permissioncontroller"}
+        "com.google.android.permissioncontroller",
+        "com.gretzky.GlobalKey", "com.onn.bluetoothconnect",
+        "com.google.android.tv.dfuservice", "com.google.android.tv.remote.service"}
 WIFI_PROVISIONERS = {"com.google.android.tungsten.setupwraith"}
 
 
@@ -41,6 +43,9 @@ def check_wifi_provisioning(dev, packages):
     if not report.strip() or "Permission Denial" in report:
         raise ValueError("No se pudo comprobar la configuración Wi-Fi; no se tocará el paquete de provisión.")
     creators = set(re.findall(r"\b(?:cname|creatorName)\s*=\s*([A-Za-z_][A-Za-z0-9_.]*)", report))
+    if not creators:
+        raise ValueError("No se pudo comprobar el propietario de las redes Wi-Fi guardadas; "
+                         "no se tocará el paquete de provisión.")
     blocked = creators & candidates
     if blocked:
         raise ValueError("Un paquete de provisión creó una red Wi-Fi guardada: "

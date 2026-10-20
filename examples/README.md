@@ -5,6 +5,7 @@ Estas listas son puntos de partida para investigar, **no listas certificadas com
 | Carpeta | Referencia | Estado |
 |---------|------------|--------|
 | `xiaomi-ejemplo/` | Paquetes habituales de Xiaomi Mi TV | Orientativo, sin validación física documentada |
+| `onn-4k-2023/` | onn 4K Streaming Box 2023, solo revisión YOC | Dos candidatos de comentarios, sin validación física en la TV del propietario |
 
 Crea una lista propia con un paquete por línea y comentarios `#`. Conserva las funciones que uses. Los lanzadores HOME y teclados detectados se protegen automáticamente: no intentes eludir esa comprobación para aplicar una lista completa.
 
