@@ -6,6 +6,8 @@ Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes que lean el est
 
 ## Reglas críticas
 
+- Propietario y autor de los cambios encargados en este repositorio: `ReinierTutoriales <86568548+ReinierTutoriales@users.noreply.github.com>`. Usa esa identidad Git tanto en autor como en committer al trabajar por encargo del propietario; comprueba ambos campos antes de publicar.
+- No atribuyas autoría ni coautoría a asistentes o proveedores de herramientas. No añadas pies promocionales, enlaces de sesión ni créditos automáticos a commits, PR, documentación o código. Conserva los avisos de licencia existentes de las dependencias.
 - **Nunca** uses `pm uninstall` en paquetes del sistema. Solo `pm disable-user --user 0`.
 - Todo cambio debe ser reversible. Usa o genera `tools/restore.sh`.
 - Para operaciones en la TV, usa ADB real (TV_HOST + tools/tv.py). Para código sin dispositivo, ejecuta las pruebas y declara pendiente la validación física.
