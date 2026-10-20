@@ -213,6 +213,9 @@ def disable_stock(device, snapshot_path, expected_package):
     # A higher-priority system HOME can win even when the HOME role was granted.
     # Opening our activity was checked before the journal and the exact-package change.
     shell(device, f"pm disable-user --user 0 {stock}")
+    # Removing a HOME candidate can clear the preferred-activity selection. Set
+    # our component again after the package change, then verify the resolver.
+    shell(device, "cmd package set-home-activity --user 0 " + NEW_HOME)
     if package_state(device, stock) != 3 or current_home(device) != NEW_HOME:
         restore(device, path)
         raise RuntimeError("El reemplazo no funcionó; se restauró el HOME anterior.")
