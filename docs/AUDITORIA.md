@@ -9,7 +9,7 @@ Revisión estática del código y de la interfaz. La imagen de referencia aporta
 | Cabecera con reloj y accesos | Implementado | Reloj local, entradas disponibles, acceso a ajustes de Wi-Fi y ajustes; sin observar el estado de red ni ejecutar servicios de fondo. |
 | Zona destacada | Implementado inicialmente | El nombre cambia con el foco; Abrir e Información funcionan sobre la selección. Queda comprobar escala, recorte y navegación con mando en los dos emuladores y una TV. |
 | Tarjetas redondeadas y foco | Implementado inicialmente | Borde visible y animación corta. El arte procede de los APK instalados, con caché acotada; ninguna imagen se descarga. |
-| Catálogo de instaladas | Implementado | Una entrada por paquete, favoritos opcionales y lista completa desplazable. No hay recomendaciones ni contenido remoto. |
+| Catálogo de instaladas | Implementado | Dock horizontal de favoritos y resto de instaladas en cuadrícula desplazable, una entrada por paquete. No hay recomendaciones ni contenido remoto. |
 | Entradas HDMI visibles en fila | Pendiente | El selector de entradas ya existe, pero las entradas enumeradas no aparecen como fila en HOME. Mostrar solo entradas reales detectadas; algunos fabricantes no las exponen por la API pública. |
 | Estado externo, clima, liberador de RAM | Fuera del objetivo actual | No mostrar controles ficticios ni números no verificables. Integraciones externas requerirían permisos, compatibilidad y coste de recursos específicos. |
 

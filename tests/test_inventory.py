@@ -41,6 +41,11 @@ class InventoryTests(unittest.TestCase):
         manual = profile_tool.draft(report)["manual_review"]
         self.assertEqual(manual[0]["package"], "com.google.android.apps.tv.launcherx")
         self.assertTrue(manual[0]["protected"])
+        imported = profile_tool.draft(report, ["com.google.android.apps.tv.launcherx",
+                                              "com.unknown.package", "com.google.android.feedback"])
+        self.assertEqual([p["package"] for p in imported["packages"]], ["com.google.android.feedback"])
+        self.assertEqual([p["reason"] for p in imported["excluded"]],
+                         ["protegido", "ausente"])
 
     def test_capture_queries_only_and_reports_exact_changes(self):
         answers = {

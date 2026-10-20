@@ -45,8 +45,10 @@ public class HomeUiTest {
             waitForCatalog(scenario);
             waitUntil(scenario, activity -> {
                 RecyclerView grid = activity.findViewById(R.id.grid);
+                RecyclerView dock = activity.findViewById(R.id.dock);
                 View focused = activity.getCurrentFocus();
-                return focused != null && grid.findContainingItemView(focused) != null;
+                return focused != null && (grid.findContainingItemView(focused) != null
+                        || dock.findContainingItemView(focused) != null);
             });
             scenario.onActivity(activity -> checkViewport(activity));
             scenario.onActivity(activity -> {
@@ -59,10 +61,12 @@ public class HomeUiTest {
                 assertEquals("Only show a real TV input action", hasInput,
                         activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE);
                 RecyclerView grid = activity.findViewById(R.id.grid);
-                View tile = grid.findContainingItemView(activity.getCurrentFocus());
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                RecyclerView owner = dock.findContainingItemView(activity.getCurrentFocus()) != null ? dock : grid;
+                View tile = owner.findContainingItemView(activity.getCurrentFocus());
                 assertNotNull("An installed app must have focus", tile);
-                AppAdapter adapter = (AppAdapter) grid.getAdapter();
-                String label = adapter.at(grid.getChildAdapterPosition(tile)).label;
+                AppAdapter adapter = (AppAdapter) owner.getAdapter();
+                String label = adapter.at(owner.getChildAdapterPosition(tile)).label;
                 assertEquals("The hero must describe the focused app", label,
                         ((android.widget.TextView) activity.findViewById(R.id.hero_name)).getText().toString());
                 assertTrue(activity.findViewById(R.id.hero_open).isEnabled());
@@ -87,7 +91,10 @@ public class HomeUiTest {
             scenario.onActivity(activity -> {
                 RecyclerView grid = activity.findViewById(R.id.grid);
                 AppAdapter adapter = (AppAdapter) grid.getAdapter();
-                adapter.replace(fixtures.subList(0, 6), fixtures.subList(6, fixtures.size()));
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                ((AppAdapter) dock.getAdapter()).replace(fixtures.subList(0, 6), java.util.Collections.emptyList());
+                dock.setVisibility(View.VISIBLE);
+                adapter.replace(java.util.Collections.emptyList(), fixtures.subList(6, fixtures.size()));
                 grid.scrollToPosition(1);
             });
             waitUntil(scenario, activity -> {
@@ -97,7 +104,7 @@ public class HomeUiTest {
             });
             screenshot("fixture-grid.png");
             int[] keys = {22, 22, 22, 22, 20, 20, 20, 20, 20, 20, 20, 20,
-                    20, 20, 20, 20, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 21, 21};
+                    19, 19, 19, 19, 19, 19, 19, 19, 21, 21};
             int step = 0;
             for (int key : keys) {
                 AtomicInteger expected = new AtomicInteger();
@@ -120,9 +127,9 @@ public class HomeUiTest {
                     View focused = activity.getCurrentFocus();
                     if (grid.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) return false;
                     if (expected.get() == -1) {
-                        int firstAction = activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE
-                                ? R.id.action_inputs : R.id.action_network;
-                        return focused != null && focused.getId() == firstAction;
+                        RecyclerView dock = activity.findViewById(R.id.dock);
+                        View dockTile = focused == null ? null : dock.findContainingItemView(focused);
+                        return dockTile != null && dock.getChildAdapterPosition(dockTile) == 0;
                     }
                     View tile = focused == null ? null : grid.findContainingItemView(focused);
                     return tile != null && grid.getChildAdapterPosition(tile) == expected.get();
@@ -185,7 +192,7 @@ public class HomeUiTest {
     private void checkViewport(MainActivity activity) {
         RecyclerView grid = activity.findViewById(R.id.grid);
         View root = activity.findViewById(R.id.root);
-        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 3);
+        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
         Rect viewport = new Rect();
         assertTrue(grid.getGlobalVisibleRect(viewport));
         for (int i = 0; i < grid.getChildCount(); i++) {
@@ -201,10 +208,20 @@ public class HomeUiTest {
             assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
             assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
         }
+        RecyclerView dock = activity.findViewById(R.id.dock);
+        View dockTile = focused == null ? null : dock.findContainingItemView(focused);
+        if (dockTile != null) {
+            Rect dockViewport = new Rect();
+            assertTrue(dock.getGlobalVisibleRect(dockViewport));
+            Rect bounds = new Rect();
+            assertTrue(dockTile.getGlobalVisibleRect(bounds));
+            assertTrue("Focused dock tile clipped", dockViewport.contains(bounds));
+        }
     }
 
     private void waitForCatalog(ActivityScenario<MainActivity> scenario) {
         waitUntil(scenario, activity -> ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.grid))
+                .getAdapter()).firstApp() >= 0 || ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.dock))
                 .getAdapter()).firstApp() >= 0);
     }
     private interface Check { boolean ready(MainActivity activity); }

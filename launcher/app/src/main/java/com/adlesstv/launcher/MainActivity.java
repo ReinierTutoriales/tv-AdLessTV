@@ -32,6 +32,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
@@ -66,8 +67,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     };
     private AppRepository repository;
     private AppAdapter adapter;
+    private AppAdapter dockAdapter;
     private ArtworkLoader artwork;
     private RecyclerView grid;
+    private RecyclerView dock;
     private GridLayoutManager layout;
     private TextView empty;
     private View network;
@@ -83,6 +86,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private boolean scanning;
     private boolean destroyed;
     private int pendingGridPosition = RecyclerView.NO_POSITION;
+    private int pendingDockPosition = RecyclerView.NO_POSITION;
     private OnBackInvokedCallback backCallback;
 
     @Override protected void onCreate(Bundle state) {
@@ -103,6 +107,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         repository = new AppRepository(this);
         artwork = new ArtworkLoader(this);
         grid = findViewById(R.id.grid);
+        dock = findViewById(R.id.dock);
         empty = findViewById(R.id.empty);
         inputs = findViewById(R.id.action_inputs);
         settings = findViewById(R.id.action_settings);
@@ -122,8 +127,19 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
-        adapter = new AppAdapter(this, this, artwork);
+        adapter = new AppAdapter(this, this, artwork, false);
         adapter.setReducedMotion(repository.reducedMotion());
+        dockAdapter = new AppAdapter(this, new AppAdapter.Listener() {
+            @Override public void focused(AppRepository.App app) { MainActivity.this.focused(app); }
+            @Override public void opened(AppRepository.App app) { openApp(app); }
+            @Override public void options(AppRepository.App app) { showOptions(app); }
+            @Override public boolean navigate(int position, int key) { return navigateDock(position, key); }
+        }, artwork, true);
+        dockAdapter.setReducedMotion(repository.reducedMotion());
+        dock.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
+        dock.setAdapter(dockAdapter);
+        dock.setItemAnimator(null);
+        dock.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
         layout = new GridLayoutManager(this, 4);
         layout.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override public int getSpanSize(int position) {
@@ -137,7 +153,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         grid.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
         grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             int available = right - left - grid.getPaddingLeft() - grid.getPaddingRight();
-            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 144)));
+            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 120)));
             if (columns != layout.getSpanCount()) {
                 layout.setSpanCount(columns);
                 adapter.setColumns(columns);
@@ -211,6 +227,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     @Override protected void onPause() {
         resumed = false;
         pendingGridPosition = RecyclerView.NO_POSITION;
+        pendingDockPosition = RecyclerView.NO_POSITION;
         super.onPause();
     }
 
@@ -267,6 +284,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void render() {
         pendingGridPosition = RecyclerView.NO_POSITION;
+        pendingDockPosition = RecyclerView.NO_POSITION;
         Map<String, AppRepository.App> byKey = new HashMap<>();
         for (AppRepository.App app : all) byKey.put(app.key(), app);
         Set<String> hidden = repository.hidden();
@@ -280,23 +298,43 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         for (AppRepository.App app : all) {
             if (!hidden.contains(app.packageName()) && !pinnedKeys.contains(app.key())) rest.add(app);
         }
-        adapter.replace(pinned, rest);
+        dockAdapter.replace(pinned, Collections.emptyList());
+        dock.setVisibility(pinned.isEmpty() ? View.GONE : View.VISIBLE);
+        adapter.replace(Collections.emptyList(), rest);
         selectedApp = null;
-        if (adapter.firstApp() >= 0) {
-            int candidate = adapter.indexOf(lastFocused);
-            selectedApp = adapter.at(candidate >= 0 ? candidate : adapter.firstApp());
-        }
+        int inDock = dockAdapter.indexOf(lastFocused);
+        int inGrid = adapter.indexOf(lastFocused);
+        if (inDock >= 0) selectedApp = dockAdapter.at(inDock);
+        else if (inGrid >= 0) selectedApp = adapter.at(inGrid);
+        else if (dockAdapter.firstApp() >= 0) selectedApp = dockAdapter.at(dockAdapter.firstApp());
+        else if (adapter.firstApp() >= 0) selectedApp = adapter.at(adapter.firstApp());
         updateHero();
         empty.setText(R.string.no_apps);
-        empty.setVisibility(adapter.firstApp() < 0 ? View.VISIBLE : View.GONE);
-        int selected = adapter.indexOf(lastFocused);
-        focusGrid(selected >= 0 ? selected : adapter.firstApp());
+        empty.setVisibility(adapter.firstApp() < 0 && dockAdapter.firstApp() < 0 ? View.VISIBLE : View.GONE);
+        if (inDock >= 0 || (inGrid < 0 && dockAdapter.firstApp() >= 0))
+            focusDock(inDock >= 0 ? inDock : dockAdapter.firstApp());
+        else focusGrid(inGrid >= 0 ? inGrid : adapter.firstApp());
+    }
+
+    private void focusDock(int position) {
+        if (position < 0 || position >= dockAdapter.getItemCount()) {
+            heroOpen.requestFocus(); return;
+        }
+        pendingGridPosition = RecyclerView.NO_POSITION;
+        pendingDockPosition = position;
+        RecyclerView.ViewHolder holder = dock.findViewHolderForAdapterPosition(position);
+        if (holder != null && holder.itemView.requestFocus()) return;
+        dock.scrollToPosition(position);
+        dock.post(this::applyPendingFocus);
     }
 
     private void focusGrid(int position) {
         if (position < 0 || position >= adapter.getItemCount() || adapter.isHeading(position)) {
-            settings.requestFocus(); return;
+            if (dockAdapter.firstApp() >= 0) focusDock(dockAdapter.firstApp());
+            else settings.requestFocus();
+            return;
         }
+        pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
         if (holder != null && holder.itemView.requestFocus()) return;
@@ -305,13 +343,20 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void applyPendingFocus() {
-        if (!resumed || pendingGridPosition < 0) return;
+        if (!resumed) return;
+        if (pendingDockPosition >= 0) {
+            RecyclerView.ViewHolder tile = dock.findViewHolderForAdapterPosition(pendingDockPosition);
+            if (tile != null) tile.itemView.requestFocus();
+            return;
+        }
+        if (pendingGridPosition < 0) return;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(pendingGridPosition);
         if (holder != null) holder.itemView.requestFocus();
     }
 
     @Override public void focused(AppRepository.App app) {
         pendingGridPosition = RecyclerView.NO_POSITION;
+        pendingDockPosition = RecyclerView.NO_POSITION;
         lastFocused = app.key();
         selectedApp = app;
         updateHero();
@@ -332,9 +377,24 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         int next = adapter.move(from, direction);
         if (next == GridNavigation.TOP_BAR) {
             pendingGridPosition = RecyclerView.NO_POSITION;
-            firstTopAction().requestFocus();
+            if (dockAdapter.firstApp() >= 0) focusDock(dockAdapter.firstApp());
+            else heroOpen.requestFocus();
         }
         else if (next != from) focusGrid(next);
+        return true;
+    }
+
+    private boolean navigateDock(int position, int key) {
+        if (key == KeyEvent.KEYCODE_DPAD_UP) { heroOpen.requestFocus(); return true; }
+        if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (adapter.firstApp() >= 0) focusGrid(adapter.firstApp());
+            return true;
+        }
+        if (key != KeyEvent.KEYCODE_DPAD_LEFT && key != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+        int step = key == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1;
+        if (dock.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) step = -step;
+        int next = position + step;
+        if (next >= 0 && next < dockAdapter.getItemCount()) focusDock(next);
         return true;
     }
 
@@ -398,6 +458,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 boolean reduced = !repository.reducedMotion();
                 repository.setReducedMotion(reduced);
                 adapter.setReducedMotion(reduced);
+                dockAdapter.setReducedMotion(reduced);
             }
             else if (choice == 3) requestHome();
             else if (choice == 4) openSettings("android.settings.DREAM_SETTINGS");
@@ -511,8 +572,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
         if (key == KeyEvent.KEYCODE_DPAD_UP) { firstTopAction().requestFocus(); return true; }
         if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
-            int selected = adapter.indexOf(lastFocused);
-            focusGrid(selected >= 0 ? selected : adapter.firstApp());
+            int selected = dockAdapter.indexOf(lastFocused);
+            if (dockAdapter.firstApp() >= 0) focusDock(selected >= 0 ? selected : dockAdapter.firstApp());
+            else focusGrid(adapter.indexOf(lastFocused) >= 0 ? adapter.indexOf(lastFocused) : adapter.firstApp());
             return true;
         }
         if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
