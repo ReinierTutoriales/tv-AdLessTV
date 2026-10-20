@@ -36,6 +36,27 @@ import static org.junit.Assert.*;
 public class HomeUiTest {
     private final android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
 
+    @Test public void visualThemeIsLocalAndSurvivesActivityRecreation() {
+        Context context = instrumentation.getTargetContext();
+        AppRepository preferences = new AppRepository(context);
+        int previous = preferences.visualTheme();
+        try {
+            preferences.setVisualTheme(1);
+            try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(
+                    new Intent(context, MainActivity.class))) {
+                scenario.onActivity(activity -> assertEquals(0xFF0A1018,
+                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
+                                .getBackground()).getColor()));
+                scenario.recreate();
+                scenario.onActivity(activity -> assertEquals(0xFF0A1018,
+                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
+                                .getBackground()).getColor()));
+            }
+        } finally {
+            preferences.setVisualTheme(previous);
+        }
+    }
+
     @Test public void installedAppsAreUniqueAndFitTheViewport() throws Exception {
         Context context = instrumentation.getTargetContext();
         List<AppRepository.App> installed = new AppRepository(context).scan();

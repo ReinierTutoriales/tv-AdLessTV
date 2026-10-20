@@ -43,6 +43,7 @@ final class AppRepository {
     private static final String FAVS = "favorites";
     private static final String HIDDEN = "hidden_packages";
     private static final String REDUCED_MOTION = "reduced_motion";
+    private static final String VISUAL_THEME = "visual_theme";
     private final Context context;
     private final SharedPreferences preferences;
 
@@ -127,6 +128,12 @@ final class AppRepository {
 
     void setReducedMotion(boolean enabled) {
         preferences.edit().putBoolean(REDUCED_MOTION, enabled).apply();
+    }
+
+    int visualTheme() { return preferences.getInt(VISUAL_THEME, 0); }
+
+    void setVisualTheme(int theme) {
+        preferences.edit().putInt(VISUAL_THEME, theme).apply();
     }
 
     Set<String> hidden() {

@@ -143,6 +143,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             @Override public boolean navigate(int position, int key) { return navigateDock(position, key); }
         }, artwork, true);
         dockAdapter.setReducedMotion(repository.reducedMotion());
+        VisualTheme.apply(this, repository.visualTheme(), root, findViewById(R.id.hero), dock);
         dock.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
         dock.setAdapter(dockAdapter);
         dock.setItemAnimator(null);
@@ -454,7 +455,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private void showSettings() {
         String[] labels = {getString(R.string.show_hidden), getString(R.string.reset_favorites),
                 getString(repository.reducedMotion() ? R.string.motion_enable : R.string.motion_reduce),
-                getString(R.string.default_home), getString(R.string.clock_dream), getString(R.string.settings)};
+                getString(R.string.visual_theme), getString(R.string.default_home),
+                getString(R.string.clock_dream), getString(R.string.settings)};
         new AlertDialog.Builder(this).setTitle(R.string.manage).setItems(labels, (dialog, choice) -> {
             if (choice == 0) showHidden();
             else if (choice == 1) new AlertDialog.Builder(this).setMessage(R.string.confirm_reset)
@@ -466,10 +468,26 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 adapter.setReducedMotion(reduced);
                 dockAdapter.setReducedMotion(reduced);
             }
-            else if (choice == 3) requestHome();
-            else if (choice == 4) openSettings("android.settings.DREAM_SETTINGS");
+            else if (choice == 3) showVisualThemes();
+            else if (choice == 4) requestHome();
+            else if (choice == 5) openSettings("android.settings.DREAM_SETTINGS");
             else openSettings(Settings.ACTION_SETTINGS);
         }).show();
+    }
+
+    private void showVisualThemes() {
+        String[] themes = {getString(R.string.theme_night), getString(R.string.theme_ocean),
+                getString(R.string.theme_warm)};
+        int current = repository.visualTheme();
+        new AlertDialog.Builder(this).setTitle(R.string.visual_theme)
+                .setSingleChoiceItems(themes, current >= 0 && current < themes.length ? current : 0,
+                        (dialog, choice) -> {
+                            repository.setVisualTheme(choice);
+                            VisualTheme.apply(this, choice, findViewById(R.id.root),
+                                    findViewById(R.id.hero), dock);
+                            dialog.dismiss();
+                        })
+                .setNegativeButton(android.R.string.cancel, null).show();
     }
 
     private void requestHome() {

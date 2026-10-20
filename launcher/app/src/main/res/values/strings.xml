@@ -32,4 +32,8 @@
     <string name="confirm_reset">¿Restablecer el orden inicial de favoritos?</string>
     <string name="motion_reduce">Reducir movimiento</string>
     <string name="motion_enable">Activar movimiento</string>
+    <string name="visual_theme">Tema visual</string>
+    <string name="theme_night">Noche</string>
+    <string name="theme_ocean">Océano</string>
+    <string name="theme_warm">Cálido</string>
 </resources>
