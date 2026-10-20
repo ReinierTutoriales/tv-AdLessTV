@@ -25,6 +25,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.util.TypedValue;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import android.widget.TextView;
@@ -115,6 +116,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         heroOpen = findViewById(R.id.hero_open);
         heroInfo = findViewById(R.id.hero_info);
         heroName = findViewById(R.id.hero_name);
+        if (getResources().getDisplayMetrics().heightPixels < AppAdapter.dp(this, 500)) {
+            findViewById(R.id.date).setVisibility(View.GONE);
+            findViewById(R.id.hero_hint).setVisibility(View.GONE);
+            findViewById(R.id.top_bar).setMinimumHeight(AppAdapter.dp(this, 52));
+            heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 23);
+        }
         heroOpen.setOnClickListener(v -> { if (selectedApp != null) openApp(selectedApp); });
         heroInfo.setOnClickListener(v -> { if (selectedApp != null) openAppDetails(selectedApp); });
         heroOpen.setOnKeyListener((v, key, event) -> heroKey(key, event));

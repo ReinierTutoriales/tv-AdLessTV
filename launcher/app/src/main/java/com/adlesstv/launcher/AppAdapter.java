@@ -47,6 +47,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Listener listener;
     private final ArtworkLoader artwork;
     private final boolean dock;
+    private final int dockWidth;
     private int columns = 4;
     private boolean reducedMotion;
     private GridNavigation navigation = new GridNavigation(new boolean[0], 4);
@@ -56,6 +57,8 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.listener = listener;
         this.artwork = artwork;
         this.dock = dock;
+        dockWidth = dp(context, context.getResources().getDisplayMetrics().heightPixels
+                < dp(context, 500) ? 108 : 126);
         setHasStableIds(true);
     }
 
@@ -136,7 +139,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
         Tile tile = new Tile(context);
         RecyclerView.LayoutParams params = new RecyclerView.LayoutParams(
-                dock ? dp(context, 126) : ViewGroup.LayoutParams.MATCH_PARENT,
+                dock ? dockWidth : ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         int margin = dp(context, dock ? 5 : 7);
         params.setMargins(margin, margin, margin, margin);
