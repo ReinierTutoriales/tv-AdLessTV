@@ -208,6 +208,18 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(self.dev.current, 'com.factory.home/.Home')
         self.assertFalse(self.path.exists())
 
+    def test_preflight_rejects_ok_with_activity_error(self):
+        original = self.dev.shell
+        def response(command):
+            if command.startswith('am start -W '):
+                return 'Status: ok\nError: Activity not started\n'
+            return original(command)
+        with patch.object(self.dev, 'shell', side_effect=response):
+            with self.assertRaisesRegex(ValueError, 'No se confirmó'):
+                home.activate(self.dev, self.path)
+        self.assertEqual(self.dev.current, 'com.factory.home/.Home')
+        self.assertFalse(self.path.exists())
+
     def test_home_activation_rejects_nonzero_foreground_user(self):
         self.dev.current_user = '10'
         with self.assertRaisesRegex(ValueError, 'usuario visible'):

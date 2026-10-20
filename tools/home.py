@@ -99,6 +99,12 @@ def check_replacement_claimants(device, previous):
                          + ". Revisa sus funciones y resuelve la competencia antes de desactivar el HOME anterior.")
 
 
+def launched_successfully(output):
+    """Some Android builds print Status: ok even alongside an activity-start error."""
+    lines = [line.strip() for line in output.splitlines()]
+    return "Status: ok" in lines and not any(line.lower().startswith("error:") for line in lines)
+
+
 def settle_configuration(device):
     # AOSP batches package/preferred-activity writes with WRITE_SETTINGS_DELAY=10s.
     # Immediate ADB reboot can otherwise lose a change already visible in memory.
@@ -132,7 +138,7 @@ def activate(device, snapshot_path, stock_package=None):
         raise ValueError("Instala y abre AdLessTV antes de activarlo como HOME.")
     # Preflight the activity itself before changing HOME.
     launched = shell(device, "am start -W -n " + NEW_HOME)
-    if "Status: ok" not in launched:
+    if not launched_successfully(launched):
         raise ValueError("No se confirmó el inicio de AdLessTV; HOME sigue intacto.")
     data = {"version": 2, "device": identity(device), "previous": previous,
             "previous_state": original_state, "activated_boot": initial_boot,
@@ -196,7 +202,7 @@ def disable_stock(device, snapshot_path, expected_package):
     check_replacement_claimants(device, data["previous"])
     if package_state(device, stock) != data["previous_state"]:
         raise ValueError("Cambió el estado del HOME anterior; no se desactivará.")
-    if "Status: ok" not in shell(device, "am start -W -n " + NEW_HOME):
+    if not launched_successfully(shell(device, "am start -W -n " + NEW_HOME)):
         raise ValueError("AdLessTV no abre; no se desactivará el HOME anterior.")
     data["stock_package"] = stock
     data["changed_boot"] = boot_id(device)
