@@ -117,6 +117,10 @@ class InventoryTests(unittest.TestCase):
                 profile_tool.catalog_list(report, root)
         actual = Path(__file__).resolve().parents[1] / "examples"
         self.assertEqual(profile_tool.catalog_list(report, actual).name, "candidates.txt")
+        for codename, directory in (("sabrina", "google-tv-sabrina"),
+                                    ("twilight", "xiaomi-tv-box-s3")):
+            self.assertEqual(profile_tool.catalog_list(
+                {**report, "device_codename": codename}, actual).parent.name, directory)
 
 
 if __name__ == "__main__":

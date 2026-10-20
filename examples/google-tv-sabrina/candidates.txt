@@ -1,0 +1,4 @@
+# Chromecast con Google TV 4K (sabrina): investigación, no perfil validado.
+# HOME, provisión Wi-Fi, Cast, voz, mando y actualizaciones quedan fuera.
+com.google.android.feedback
+com.android.tv.feedbackconsent
