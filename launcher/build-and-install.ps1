@@ -27,7 +27,8 @@ try {
 }
 if ($installCode -ne 0 -or $result -notmatch 'Success') { throw "Instalación fallida: $result" }
 $result = & $Python $client '--host' $TvHost 'am start -W -n com.adlesstv.launcher/.MainActivity'
-if ($LASTEXITCODE -ne 0 -or $result -notmatch 'Status: ok') { throw "El lanzador no inició: $result" }
+if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Status: ok\s*$' -or
+    ($result -join "`n") -match '(?im)^Error:') { throw "El lanzador no inició: $result" }
 if ($HomeSnapshot) {
     $parent = Split-Path -Parent $HomeSnapshot
     if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }

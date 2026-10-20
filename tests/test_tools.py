@@ -208,6 +208,9 @@ class DebloatTests(unittest.TestCase):
         self.dev.wifi_report = ''
         with self.assertRaisesRegex(ValueError, 'No se pudo comprobar'):
             debloat.plan(self.dev, [candidate])
+        self.dev.wifi_report = 'Wi-Fi status available but owners omitted'
+        with self.assertRaisesRegex(ValueError, 'propietario'):
+            debloat.plan(self.dev, [candidate])
         self.dev.wifi_report = 'cname=com.other.provisioner'
         snapshot = debloat.plan(self.dev, [candidate])
         self.dev.wifi_report = 'cname=' + candidate
@@ -219,7 +222,8 @@ class DebloatTests(unittest.TestCase):
         for package in ('com.test.home', 'com.other.launcher', 'com.test.keyboard',
                         'com.android.systemui', 'com.android.tv.settings',
                         'com.adlesstv.launcher', 'com.android.bluetooth', 'com.android.providers.tv',
-                        'com.test.input'):
+                        'com.test.input', 'com.gretzky.GlobalKey', 'com.onn.bluetoothconnect',
+                        'com.google.android.tv.dfuservice', 'com.google.android.tv.remote.service'):
             with self.assertRaisesRegex(ValueError, 'protegidos'):
                 debloat.plan(self.dev, [package])
         self.assertEqual(self.dev.writes, [])

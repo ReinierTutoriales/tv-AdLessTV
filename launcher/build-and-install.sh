@@ -39,7 +39,9 @@ if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
   printf 'Instalación fallida: %s\n' "$result" >&2; exit 1
 fi
 result="$("$PY" "$ROOT/../tools/tv.py" 'am start -W -n com.adlesstv.launcher/.MainActivity')"
-if [[ "$result" != *'Status: ok'* ]]; then printf 'El lanzador no inició: %s\n' "$result" >&2; exit 1; fi
+if [[ ! "$result" =~ (^|$'\n')Status:\ ok($|$'\n') || "$result" =~ (^|$'\n')Error: ]]; then
+  printf 'El lanzador no inició: %s\n' "$result" >&2; exit 1
+fi
 if [[ -n "$HOME_SNAPSHOT" ]]; then
   mkdir -p "$(dirname -- "$HOME_SNAPSHOT")"
   home_args=(--activate "$HOME_SNAPSHOT")

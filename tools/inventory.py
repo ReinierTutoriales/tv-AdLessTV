@@ -30,6 +30,7 @@ def capture(device, review=False):
     if not installed or not disabled.issubset(installed):
         raise ValueError("Inventario incompleto o incoherente; no se guardará.")
     result = {"version": 1, "user": 0, "device": identity(device),
+            "device_codename": shell(device, "getprop ro.product.device").strip(),
             "firmware": shell(device, "getprop ro.build.fingerprint").strip(),
             "captured_at": datetime.now(timezone.utc).isoformat(),
             "installed": sorted(installed), "disabled": sorted(disabled)}
@@ -48,6 +49,7 @@ def validate(data):
     if (not isinstance(data, dict) or data.get("version") != 1 or data.get("user") != 0
             or not isinstance(data.get("device"), dict)
             or not isinstance(data.get("firmware"), str)
+            or ("device_codename" in data and not isinstance(data["device_codename"], str))
             or not isinstance(data.get("installed"), list)
             or not isinstance(data.get("disabled"), list)):
         raise ValueError("Inventario anterior inválido.")
@@ -64,6 +66,9 @@ def compare(before, after):
     validate(after)
     if before["device"] != after["device"]:
         raise ValueError("Los inventarios pertenecen a TVs o perfiles diferentes.")
+    if (before.get("device_codename") and after.get("device_codename")
+            and before["device_codename"] != after["device_codename"]):
+        raise ValueError("Cambió el identificador interno del dispositivo; revisa los inventarios.")
     if before["firmware"] != after["firmware"]:
         raise ValueError("Cambió el firmware; compara únicamente la misma compilación.")
     first, last = set(before["disabled"]), set(after["disabled"])

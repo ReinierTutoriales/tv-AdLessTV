@@ -26,7 +26,9 @@ import json, os, sys
 with open(os.environ['TEST_CAPTURE'], 'a') as stream: stream.write(json.dumps(sys.argv[1:]) + '\\n')
 if 'pm install -r /data/local/tmp/adlesstv-preview.apk' in sys.argv:
  print('Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]' if os.environ.get('FAIL_INSTALL') else 'Success')
-elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv: print('Status: ok')
+elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
+ print('Status: ok')
+ if os.environ.get('FAIL_START'): print('Error: Activity not started')
 ''')
             client.chmod(0o700)
             capture = root / 'calls.jsonl'
@@ -44,6 +46,11 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv: print('St
             failed_calls = [json.loads(line) for line in capture.read_text().splitlines()]
             self.assertIn('rm -f /data/local/tmp/adlesstv-preview.apk',
                           [arg for call in failed_calls for arg in call])
+            self.assertNotIn('--activate', capture.read_text())
+            capture.unlink()
+            bad_start = subprocess.run(command, cwd=root, env={**environment, 'FAIL_START': '1'},
+                                       capture_output=True, text=True)
+            self.assertNotEqual(bad_start.returncode, 0)
             self.assertNotIn('--activate', capture.read_text())
 
 

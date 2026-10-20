@@ -1,0 +1,7 @@
+# TV Box S 3rd gen (twilight): investigación, no perfil validado.
+# Verificar actividades y servicios de cada paquete antes de aplicar.
+# HOME, provisión Wi-Fi, mando, Cast, voz y actualizaciones quedan fuera.
+com.google.android.feedback
+com.android.tv.feedbackconsent
+com.miui.tv.analytics
+com.xiaomi.statistic

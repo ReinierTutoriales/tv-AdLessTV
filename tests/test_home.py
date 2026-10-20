@@ -144,6 +144,20 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(self.dev.stock_state, 0)
         self.assertEqual(self.dev.current, 'com.factory.home/.Home')
 
+    def test_stock_disable_sets_preferred_home_after_candidate_changes(self):
+        original = self.dev.shell
+        def response(command):
+            result = original(command)
+            if command == 'pm disable-user --user 0 com.factory.home':
+                self.dev.current = 'com.android.settings/.FallbackHome'
+            return result
+        with patch.object(self.dev, 'shell', side_effect=response), contextlib.redirect_stdout(io.StringIO()):
+            home.activate(self.dev, self.path, 'com.factory.home')
+        self.assertEqual(self.dev.current, home.NEW_HOME)
+        commands = self.dev.commands
+        disable = commands.index('pm disable-user --user 0 com.factory.home')
+        self.assertEqual(commands[disable + 1], 'cmd package set-home-activity --user 0 ' + home.NEW_HOME)
+
     def test_disable_stock_rejects_different_package_or_manual_home_change(self):
         with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path)
         self.dev.boot = '22222222-2222-2222-2222-222222222222'
@@ -201,6 +215,18 @@ class HomeTests(unittest.TestCase):
         original = self.dev.shell
         def response(command):
             if command.startswith('am start -W '): return 'Status: timeout\n'
+            return original(command)
+        with patch.object(self.dev, 'shell', side_effect=response):
+            with self.assertRaisesRegex(ValueError, 'No se confirmó'):
+                home.activate(self.dev, self.path)
+        self.assertEqual(self.dev.current, 'com.factory.home/.Home')
+        self.assertFalse(self.path.exists())
+
+    def test_preflight_rejects_ok_with_activity_error(self):
+        original = self.dev.shell
+        def response(command):
+            if command.startswith('am start -W '):
+                return 'Status: ok\nError: Activity not started\n'
             return original(command)
         with patch.object(self.dev, 'shell', side_effect=response):
             with self.assertRaisesRegex(ValueError, 'No se confirmó'):

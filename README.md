@@ -10,6 +10,7 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 
 - Inicio adaptable: una cuadrícula desplazable con favoritos al principio, tarjetas con proporción fija, reloj y accesos compactos; D-pad y clic del mando.
 - Mantener OK o pulsar Menú sobre una app para añadir/quitar favorito, moverlo a izquierda o derecha u ocultarla; ajustes del lanzador para recuperar apps ocultas y restablecer favoritos.
+- Tres paletas visuales opacas (Noche, Océano y Cálido) en Personalizar. Se guardan solo en la TV y cambian sin red, fondos animados ni servicios permanentes.
 - Recuperación del foco por identidad al volver de una aplicación, sin volver a consultar todos los paquetes ni reconstruir el inicio.
 - Accesos a entradas, ajustes de Wi-Fi y ajustes del sistema; salvapantallas de reloj opcional.
 - Conexión ADB desde Python, sin instalar el ejecutable `adb`.
@@ -51,6 +52,7 @@ export TV_HOST=192.168.1.50
 
 Puedes generar un borrador de perfil vinculado al modelo y firmware capturados: `python tools/inventory.py --review --output backups/inventario.json` y después `python tools/profile.py --inventory backups/inventario.json --output backups/perfil.json`. Sus pocos candidatos se comprueban manualmente; `debloat.py` rechazará el borrador hasta que hayas revisado cada entrada y cambiado `review_required` a `false`. Los detalles y límites están en [examples/README.md](examples/README.md).
 Si ya tienes una lista orientativa del modelo, `tools/profile.py --list lista.txt` la cruza con ese inventario y separa nombres ausentes, desactivados, protegidos o asociados a funciones delicadas. No convierte la lista en cambios automáticos.
+Con `tools/profile.py --catalog` se selecciona una lista de investigación de `examples/` únicamente si coincide el identificador interno del dispositivo; se prefiere una entrada para el fingerprint exacto y se rechazan coincidencias ambiguas. Aun así exige revisión y respaldo antes de aplicar.
 
 El stick normalmente no tiene puertos HDMI de **entrada** ni sintonizador, pero el software comprueba las entradas ofrecidas por Android antes de ocultar el acceso. Para el debloat usa un perfil del **modelo y fingerprint exactos**, y conserva mando, emparejamiento Bluetooth, Play Services/Store y las funciones que utilices. No se borran datos de apps ni cachés indiscriminadamente.
 
