@@ -43,7 +43,7 @@ export TV_HOST=192.168.1.50
 .venv/bin/python tools/tv.py --probe
 ```
 
-`TV_PORT` cambia el puerto (5555 por defecto). También puedes usar `--host` y `--port` antes de la operación. Las claves se guardan en `tools/adbkey/` y se reutilizan; no las publiques. Desactiva la depuración cuando termines.
+`TV_PORT` cambia el puerto (5555 por defecto). También puedes usar `--host` y `--port` antes de la operación. Si ya existe `~/.android/adbkey`, el cliente reutiliza esa identidad ADB; si no, crea y reutiliza una clave en `tools/adbkey/`. No publiques las claves. Desactiva la depuración cuando termines.
 
 ### Stick 4K con 2 GB de RAM y 8 GB de almacenamiento
 

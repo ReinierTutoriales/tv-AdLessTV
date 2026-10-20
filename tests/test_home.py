@@ -223,6 +223,12 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(self.dev.stock_state, 0)
         self.assertFalse(any(c.startswith('pm disable-user') for c in self.dev.commands))
 
+    def test_system_settings_fallback_is_not_an_active_launcher_competitor(self):
+        for fallback in home.SYSTEM_FALLBACK_HOMES:
+            self.dev.extra_home = fallback
+            home.check_replacement_claimants(self.dev, self.dev.current)
+        self.assertEqual(self.dev.stock_state, 0)
+
     def test_new_home_claimant_after_activation_blocks_optional_disable(self):
         with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path)
         self.dev.extra_home = 'com.vendor.setup/.RecoveryActivity'

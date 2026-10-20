@@ -18,7 +18,11 @@ def get_signer(keydir=None):
     from adb_shell.auth.keygen import keygen
     from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
-    directory = Path(keydir or Path(__file__).resolve().parent / "adbkey")
+    if keydir is not None:
+        directory = Path(keydir)
+    else:
+        platform_key = Path.home() / ".android" / "adbkey"
+        directory = platform_key.parent if platform_key.is_file() else Path(__file__).resolve().parent / "adbkey"
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     key = directory / "adbkey"
     public = directory / "adbkey.pub"
