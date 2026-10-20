@@ -23,6 +23,7 @@ class Device:
         self.foreground = self.current
         self.current_user = '0'
         self.extra_home = None
+        self.wifi_report = 'creatorName=com.other.provisioner'
 
     def shell(self, command):
         self.commands.append(command)
@@ -34,6 +35,7 @@ class Device:
             if self.extra_home: claimants.append(self.extra_home)
             return '\n'.join(claimants)
         if command == 'cat /proc/sys/kernel/random/boot_id': return self.boot
+        if command == 'dumpsys wifi': return self.wifi_report
         if command.startswith('pm path '): return 'package:/data/app/app.apk\n'
         if command.startswith('am start -W '):
             self.foreground = home.NEW_HOME
@@ -261,6 +263,38 @@ class HomeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'com.vendor.setup'):
             home.disable_stock(self.dev, self.path, 'com.factory.home')
         self.assertEqual(self.dev.stock_state, 0)
+
+    def test_setup_home_that_owns_saved_wifi_is_never_disabled(self):
+        stock = 'com.google.android.tungsten.setupwraith'
+        self.dev.current = stock + '/.Home'
+        self.dev.wifi_report = 'creatorName=' + stock
+        original = self.dev.shell
+        def response(command):
+            if command == home.QUERY_HOME:
+                return '\n'.join((stock + '/.Home', home.NEW_HOME))
+            return original(command)
+        with patch.object(self.dev, 'shell', side_effect=response):
+            with self.assertRaisesRegex(ValueError, 'red Wi-Fi guardada'):
+                home.activate(self.dev, self.path, stock)
+        self.assertFalse(self.path.exists())
+        self.assertFalse(any(c.startswith('cmd package set-home-activity') or
+                             c.startswith('pm disable-user') for c in self.dev.commands))
+
+    def test_wifi_guard_rechecked_before_optional_stock_disable(self):
+        stock = 'com.google.android.tungsten.setupwraith'
+        self.dev.current = stock + '/.Home'
+        original = self.dev.shell
+        def response(command):
+            if command == home.QUERY_HOME:
+                return '\n'.join((stock + '/.Home', home.NEW_HOME))
+            return original(command)
+        with patch.object(self.dev, 'shell', side_effect=response), contextlib.redirect_stdout(io.StringIO()):
+            home.activate(self.dev, self.path)
+            self.dev.wifi_report = 'cname=' + stock
+            with self.assertRaisesRegex(ValueError, 'red Wi-Fi guardada'):
+                home.disable_stock(self.dev, self.path, stock)
+        self.assertEqual(self.dev.stock_state, 0)
+        self.assertFalse(any(c.startswith('pm disable-user') for c in self.dev.commands))
 
     def test_restore_rejects_wrong_device_or_manual_change(self):
         with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path)
