@@ -24,6 +24,8 @@ El script de instalación compila, instala y abre una vista previa; `--make-home
 
 `tools/debloat.py disable --profile archivo.json` admite perfiles de modelo y fingerprint exactos con motivo por paquete. Sigue simulando salvo `--apply --snapshot`. No hay perfiles certificados sin prueba física; `examples/profile.template.json` es solo un esquema ilustrativo.
 
+`tools/profile.py` prepara offline un borrador para el modelo y fingerprint capturados por `tools/inventory.py --review`. Solo sugiere cuatro paquetes conocidos de informes o analítica cuando están instalados, activos y no protegidos; sus motivos describen qué comprobar, no certifican ausencia de dependencias. `review_required: true` impide usar el borrador directamente con `debloat.py`. Tras revisión local explícita puede marcarse `false`, simularse y aplicarse con respaldo. No se importa una lista completa de otro firmware ni se infiere que el modelo permita reemplazar HOME.
+
 Antes de desactivar un paquete de provisión Wi-Fi conocido, la herramienta examina localmente `dumpsys wifi` para detectar si es creador de alguna red guardada. Si hay dependencia o no se puede leer el informe, cancela; no almacena SSIDs ni el informe. Este chequeo acotado no certifica la seguridad de desactivar otros paquetes que un fabricante haya acoplado a la red. Si ADB depende de Wi-Fi, conviene comprobar reconexión y recuperación antes de aplicar el perfil.
 
 El menú del lanzador permite reducir el movimiento de las tarjetas conservando el borde de foco. Se guarda solo en preferencias del dispositivo. Las imágenes renderizadas son opacas RGB_565 y se descartan los trabajos de una generación anterior cuando cambian los paquetes; queda pendiente medir la mejora real en hardware con poca RAM.

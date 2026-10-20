@@ -65,6 +65,9 @@ def read_packages(path):
 
 def read_profile(path):
     data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if isinstance(data, dict) and "review_required" in data and data["review_required"] is not False:
+        raise ValueError("El perfil generado requiere revisión: comprueba cada paquete y marca "
+                         "review_required=false antes de simularlo o aplicarlo.")
     if (not isinstance(data, dict) or data.get("version") != 1
             or not isinstance(data.get("model"), str) or not data["model"].strip()
             or not isinstance(data.get("firmware"), str) or not data["firmware"].strip()
