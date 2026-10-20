@@ -137,6 +137,18 @@ public class HomeUiTest {
                 scenario.onActivity(activity -> checkViewport(activity));
                 if (++step == 16) screenshot("fixture-last-row.png");
             }
+            AtomicBoolean stillInGrid = new AtomicBoolean();
+            scenario.onActivity(activity -> {
+                RecyclerView grid = activity.findViewById(R.id.grid);
+                stillInGrid.set(grid.findContainingItemView(activity.getCurrentFocus()) != null);
+            });
+            if (stillInGrid.get()) instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View focus = activity.getCurrentFocus();
+                View tile = focus == null ? null : dock.findContainingItemView(focus);
+                return tile != null && dock.getChildAdapterPosition(tile) == 0;
+            });
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
             waitUntil(scenario, activity -> activity.getCurrentFocus() == activity.findViewById(R.id.hero_open));
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
