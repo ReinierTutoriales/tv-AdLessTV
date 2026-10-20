@@ -36,10 +36,14 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv: print('St
             success = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True)
             self.assertEqual(success.returncode, 0, success.stderr)
             calls = [json.loads(line) for line in capture.read_text().splitlines()]
+            self.assertIn('rm -f /data/local/tmp/adlesstv-preview.apk', [arg for call in calls for arg in call])
             self.assertEqual(calls[-1][1:], ['--activate', 'backups/home.json', '--stock-package', 'com.factory.home'])
             capture.unlink()
             failure = subprocess.run(command, cwd=root, env={**environment, 'FAIL_INSTALL': '1'}, capture_output=True)
             self.assertNotEqual(failure.returncode, 0)
+            failed_calls = [json.loads(line) for line in capture.read_text().splitlines()]
+            self.assertIn('rm -f /data/local/tmp/adlesstv-preview.apk',
+                          [arg for call in failed_calls for arg in call])
             self.assertNotIn('--activate', capture.read_text())
 
 

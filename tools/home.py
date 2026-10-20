@@ -11,6 +11,8 @@ from debloat import CORE, PACKAGE, identity, package_state, require_user_zero, w
 from tv import RemoteError, connect, shell
 
 NEW_HOME = "com.adlesstv.launcher/.MainActivity"
+SYSTEM_FALLBACK_HOMES = {"com.android.tv.settings/.system.FallbackHome",
+                         "com.android.settings/.FallbackHome"}
 COMPONENT = re.compile(r"[a-zA-Z_][\w.]*/[a-zA-Z_.$][\w.$]*")
 RESOLVE = "cmd package resolve-activity --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME -c android.intent.category.DEFAULT"
 QUERY_HOME = "cmd package query-activities --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME"
@@ -89,7 +91,9 @@ def check_replacement_claimants(device, previous):
     candidates = home_claimants(device)
     if previous not in candidates or NEW_HOME not in candidates:
         raise ValueError("El HOME anterior o AdLessTV no aparece entre las actividades HOME habilitadas.")
-    other = candidates - {previous, NEW_HOME}
+    # The platform Settings fallback has a low-priority HOME filter for Direct Boot.
+    # Keep the package enabled; verify the actual resolved HOME after the switch.
+    other = candidates - {previous, NEW_HOME} - SYSTEM_FALLBACK_HOMES
     if other:
         raise ValueError("Otras actividades también reclaman HOME: " + ", ".join(sorted(other))
                          + ". Revisa sus funciones y resuelve la competencia antes de desactivar el HOME anterior.")

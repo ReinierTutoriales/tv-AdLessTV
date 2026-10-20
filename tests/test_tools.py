@@ -41,6 +41,16 @@ class TvTests(unittest.TestCase):
                 tv.get_signer(directory)
             self.assertEqual(public.read_text(), 'keep')
 
+    def test_prefers_existing_platform_adb_key_without_generating_a_second_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            platform = Path(directory) / '.android'
+            tv.get_signer(platform)
+            key = platform / 'adbkey'
+            before = key.read_bytes()
+            with patch.object(Path, 'home', return_value=Path(directory)):
+                tv.get_signer()
+            self.assertEqual(key.read_bytes(), before)
+
     @unittest.skipIf(sys.platform == 'win32', 'Requires POSIX shell')
     def test_real_shell_exit_status_quoting_and_missing_newline(self):
         dev = Mock()

@@ -17,8 +17,15 @@ if (-not $TvHost) { throw 'Define TV_HOST con la IP de tu TV.' }
 $client = Join-Path $root '..\tools\tv.py'
 & $Python $client '--host' $TvHost '--push' $apk '/data/local/tmp/adlesstv-preview.apk'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$result = & $Python $client '--host' $TvHost 'pm install -r /data/local/tmp/adlesstv-preview.apk'
-if ($LASTEXITCODE -ne 0 -or $result -notmatch 'Success') { throw "Instalación fallida: $result" }
+$installCode = 1
+try {
+    $result = & $Python $client '--host' $TvHost 'pm install -r /data/local/tmp/adlesstv-preview.apk'
+    $installCode = $LASTEXITCODE
+} finally {
+    try { & $Python $client '--host' $TvHost 'rm -f /data/local/tmp/adlesstv-preview.apk' | Out-Null }
+    catch { Write-Warning 'No se pudo borrar el APK temporal de la TV; revisa /data/local/tmp cuando vuelva ADB.' }
+}
+if ($installCode -ne 0 -or $result -notmatch 'Success') { throw "Instalación fallida: $result" }
 $result = & $Python $client '--host' $TvHost 'am start -W -n com.adlesstv.launcher/.MainActivity'
 if ($LASTEXITCODE -ne 0 -or $result -notmatch 'Status: ok') { throw "El lanzador no inició: $result" }
 if ($HomeSnapshot) {

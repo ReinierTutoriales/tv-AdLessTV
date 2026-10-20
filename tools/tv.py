@@ -18,7 +18,11 @@ def get_signer(keydir=None):
     from adb_shell.auth.keygen import keygen
     from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
-    directory = Path(keydir or Path(__file__).resolve().parent / "adbkey")
+    if keydir is not None:
+        directory = Path(keydir)
+    else:
+        platform_key = Path.home() / ".android" / "adbkey"
+        directory = platform_key.parent if platform_key.is_file() else Path(__file__).resolve().parent / "adbkey"
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     key = directory / "adbkey"
     public = directory / "adbkey.pub"
@@ -103,8 +107,15 @@ def main(argv=None):
             print(shell(dev, " ".join(args.command)))
         else:
             for prop in ("ro.product.model", "ro.product.device", "ro.build.version.release",
-                         "ro.build.version.sdk", "ro.build.display.id", "ro.product.manufacturer"):
+                         "ro.build.version.sdk", "ro.build.display.id", "ro.build.fingerprint",
+                         "ro.product.manufacturer"):
                 print(f"{prop}: {shell(dev, 'getprop ' + prop).strip()}")
+            memory = shell(dev, "cat /proc/meminfo")
+            total = re.search(r"^MemTotal:\s*(\d+) kB\s*$", memory, re.MULTILINE)
+            if total:
+                print(f"RAM total detectada: {int(total[1]) // 1024} MiB")
+            print("Almacenamiento de datos (/data):")
+            print(shell(dev, "df -k /data").strip())
         return 0
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)

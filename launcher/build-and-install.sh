@@ -28,8 +28,16 @@ if [[ "$BUILD_ONLY" == 1 ]]; then printf 'APK: %s\n' "$APK"; exit 0; fi
 PY="${PYTHON:-python3}"
 export MSYS_NO_PATHCONV=1
 "$PY" "$ROOT/../tools/tv.py" --push "$APK" /data/local/tmp/adlesstv-preview.apk
-result="$("$PY" "$ROOT/../tools/tv.py" 'pm install -r /data/local/tmp/adlesstv-preview.apk')"
-if [[ "$result" != *Success* ]]; then printf 'Instalación fallida: %s\n' "$result" >&2; exit 1; fi
+if result="$("$PY" "$ROOT/../tools/tv.py" 'pm install -r /data/local/tmp/adlesstv-preview.apk')"; then
+  install_status=0
+else
+  install_status=$?
+fi
+# The APK is staged in /data/local/tmp; keep no extra copy on an 8 GB stick.
+"$PY" "$ROOT/../tools/tv.py" 'rm -f /data/local/tmp/adlesstv-preview.apk' >/dev/null || true
+if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
+  printf 'Instalación fallida: %s\n' "$result" >&2; exit 1
+fi
 result="$("$PY" "$ROOT/../tools/tv.py" 'am start -W -n com.adlesstv.launcher/.MainActivity')"
 if [[ "$result" != *'Status: ok'* ]]; then printf 'El lanzador no inició: %s\n' "$result" >&2; exit 1; fi
 if [[ -n "$HOME_SNAPSHOT" ]]; then
