@@ -46,21 +46,26 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Context context;
     private final Listener listener;
     private final ArtworkLoader artwork;
+    private final boolean dock;
+    private final int dockWidth;
     private int columns = 4;
     private boolean reducedMotion;
     private GridNavigation navigation = new GridNavigation(new boolean[0], 4);
 
-    AppAdapter(Context context, Listener listener, ArtworkLoader artwork) {
+    AppAdapter(Context context, Listener listener, ArtworkLoader artwork, boolean dock) {
         this.context = context;
         this.listener = listener;
         this.artwork = artwork;
+        this.dock = dock;
+        dockWidth = dp(context, context.getResources().getDisplayMetrics().heightPixels
+                < dp(context, 500) ? 108 : 126);
         setHasStableIds(true);
     }
 
     void replace(List<AppRepository.App> favorites, List<AppRepository.App> apps) {
         List<Entry> next = new ArrayList<>();
         if (!favorites.isEmpty()) {
-            next.add(new Entry(null, R.string.favorites, 0));
+            if (!dock) next.add(new Entry(null, R.string.favorites, 0));
             for (AppRepository.App app : favorites) next.add(new Entry(app, 0, artwork.revision()));
         }
         if (!apps.isEmpty()) {
@@ -134,8 +139,10 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
         Tile tile = new Tile(context);
         RecyclerView.LayoutParams params = new RecyclerView.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.setMargins(dp(context, 7), dp(context, 7), dp(context, 7), dp(context, 7));
+                dock ? dockWidth : ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        int margin = dp(context, dock ? 5 : 7);
+        params.setMargins(margin, margin, margin, margin);
         tile.setLayoutParams(params);
         return new Holder(tile);
     }

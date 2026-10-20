@@ -30,15 +30,15 @@
         </LinearLayout>
     </RelativeLayout>
     <LinearLayout android:id="@+id/hero" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:minHeight="112dp" android:layout_marginTop="12dp"
-        android:layout_marginBottom="8dp" android:orientation="vertical"
+        android:layout_height="wrap_content" android:minHeight="88dp" android:layout_marginTop="6dp"
+        android:layout_marginBottom="4dp" android:orientation="vertical"
         android:gravity="center_vertical" android:paddingStart="22dp" android:paddingEnd="22dp"
         android:background="@drawable/hero_surface">
         <TextView android:id="@+id/hero_name" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
             android:text="@string/app_name" android:textSize="27sp"
             android:textStyle="bold" android:textColor="#F6F7FA" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        <TextView android:id="@+id/hero_hint" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="@string/long_press_hint" android:textSize="13sp" android:textColor="#B4BEC9"
             android:maxLines="1" android:ellipsize="end" />
         <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -49,6 +49,13 @@
                 android:layout_marginStart="10dp" android:text="@string/app_details" />
         </LinearLayout>
     </LinearLayout>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/dock"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:layout_marginBottom="8dp"
+        android:padding="5dp" android:background="@drawable/dock_surface"
+        android:clipToPadding="false" android:clipChildren="false"
+        android:scrollbars="none" android:overScrollMode="never"
+        android:descendantFocusability="afterDescendants" />
     <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/grid" android:layout_width="match_parent"
             android:layout_height="match_parent" android:clipToPadding="false" android:clipChildren="false"
