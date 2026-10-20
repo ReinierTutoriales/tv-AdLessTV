@@ -149,7 +149,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         grid.setLayoutManager(layout);
         grid.setAdapter(adapter);
         grid.setItemAnimator(null);
-        grid.setHasFixedSize(true);
         grid.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
         grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             int available = right - left - grid.getPaddingLeft() - grid.getPaddingRight();
