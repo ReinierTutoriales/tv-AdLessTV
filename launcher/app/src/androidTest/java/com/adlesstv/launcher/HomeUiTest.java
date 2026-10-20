@@ -104,7 +104,7 @@ public class HomeUiTest {
             });
             screenshot("fixture-grid.png");
             int[] keys = {22, 22, 22, 22, 20, 20, 20, 20, 20, 20, 20, 20,
-                    19, 19, 19, 19, 19, 19, 19, 19, 21, 21};
+                    19, 19, 19, 19, 19, 21, 21};
             int step = 0;
             for (int key : keys) {
                 AtomicInteger expected = new AtomicInteger();
@@ -137,6 +137,15 @@ public class HomeUiTest {
                 scenario.onActivity(activity -> checkViewport(activity));
                 if (++step == 16) screenshot("fixture-last-row.png");
             }
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
+            waitUntil(scenario, activity -> activity.getCurrentFocus() == activity.findViewById(R.id.hero_open));
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View focus = activity.getCurrentFocus();
+                View tile = focus == null ? null : dock.findContainingItemView(focus);
+                return tile != null && dock.getChildAdapterPosition(tile) == 0;
+            });
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
             instrumentation.waitForIdleSync();
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_MENU);
