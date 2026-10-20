@@ -30,4 +30,6 @@
     <string name="home_role_not_selected">The system granted the home role, but still opens another launcher. Check the home app in Settings. If the TV enforces its launcher, ADB activation requires reviewing and backing up the exact package.</string>
     <string name="open_home_settings">Open home settings</string>
     <string name="confirm_reset">Restore the initial favorites order?</string>
+    <string name="motion_reduce">Reduce motion</string>
+    <string name="motion_enable">Enable motion</string>
 </resources>

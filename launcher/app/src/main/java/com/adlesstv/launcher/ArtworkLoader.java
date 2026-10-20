@@ -27,8 +27,8 @@ final class ArtworkLoader {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<ImageView, Future<?>> requests = new IdentityHashMap<>();
     private final LruCache<String, Bitmap> cache;
-    private boolean closed;
-    private int revision;
+    private volatile boolean closed;
+    private volatile int revision;
 
     ArtworkLoader(Context context) {
         this.context = context.getApplicationContext();
@@ -41,17 +41,19 @@ final class ArtworkLoader {
 
     void bind(ImageView view, AppRepository.App app) {
         cancel(view);
-        final String key = app.key() + ":" + revision;
+        final int generation = revision;
+        final String key = app.key() + ":" + generation;
         view.setTag(key);
         Bitmap ready = cache.get(key);
         view.setImageBitmap(ready);
         if (ready != null || closed) return;
         Future<?> request = workers.submit(() -> {
+            if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
             Bitmap bitmap = render(app);
-            if (Thread.currentThread().isInterrupted()) return;
-            cache.put(key, bitmap);
+            if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
             main.post(() -> {
-                if (!closed && key.equals(view.getTag())) {
+                if (!closed && revision == generation && key.equals(view.getTag())) {
+                    cache.put(key, bitmap);
                     view.setImageBitmap(bitmap);
                     requests.remove(view);
                 }
@@ -61,7 +63,8 @@ final class ArtworkLoader {
     }
 
     private Bitmap render(AppRepository.App app) {
-        Bitmap bitmap = Bitmap.createBitmap(320, 180, Bitmap.Config.ARGB_8888);
+        // Every pixel is painted opaque; 565 halves the backing memory on small sticks.
+        Bitmap bitmap = Bitmap.createBitmap(320, 180, Bitmap.Config.RGB_565);
         Canvas canvas = new Canvas(bitmap);
         canvas.drawColor(Color.rgb(28, 32, 40));
         Drawable art = null;
@@ -92,7 +95,11 @@ final class ArtworkLoader {
     }
 
     int revision() { return revision; }
-    void invalidate() { revision++; cache.evictAll(); }
+    void invalidate() {
+        revision++;
+        for (ImageView view : new java.util.ArrayList<>(requests.keySet())) cancel(view);
+        cache.evictAll();
+    }
     void trim() { cache.evictAll(); }
 
     void close() {

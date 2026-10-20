@@ -47,7 +47,7 @@ export TV_HOST=192.168.1.50
 
 ### Stick 4K con 2 GB de RAM y 8 GB de almacenamiento
 
-`--probe` muestra modelo, dispositivo, compilación, RAM detectada y espacio real de `/data`. La capacidad nominal de 8 GB incluye el sistema: utiliza el espacio libre detectado para decidir si cabe instalar el APK. El instalador borra su copia temporal de `/data/local/tmp` tras intentar la instalación. La interfaz carga imágenes locales bajo demanda en una caché de 2 o 4 MiB según la clasificación de RAM baja del propio Android; no descarga imágenes ni mantiene tareas periódicas.
+`--probe` muestra modelo, dispositivo, compilación, RAM detectada y espacio real de `/data`. La capacidad nominal de 8 GB incluye el sistema: utiliza el espacio libre detectado para decidir si cabe instalar el APK. El instalador borra su copia temporal de `/data/local/tmp` tras intentar la instalación. La interfaz carga imágenes locales opacas bajo demanda en RGB_565, con caché de 2 o 4 MiB según la clasificación de RAM baja del propio Android; cancela trabajos de carátulas obsoletos, no descarga imágenes ni mantiene tareas periódicas. Desde Personalizar puedes reducir el movimiento del foco; el borde continúa visible.
 
 El stick normalmente no tiene puertos HDMI de **entrada** ni sintonizador, pero el software comprueba las entradas ofrecidas por Android antes de ocultar el acceso. Para el debloat usa un perfil del **modelo y fingerprint exactos**, y conserva mando, emparejamiento Bluetooth, Play Services/Store y las funciones que utilices. No se borran datos de apps ni cachés indiscriminadamente.
 

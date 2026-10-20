@@ -42,6 +42,7 @@ final class AppRepository {
     private static final String PREFS = "home_choices";
     private static final String FAVS = "favorites";
     private static final String HIDDEN = "hidden_packages";
+    private static final String REDUCED_MOTION = "reduced_motion";
     private final Context context;
     private final SharedPreferences preferences;
 
@@ -123,6 +124,12 @@ final class AppRepository {
     }
 
     void resetFavorites() { preferences.edit().remove(FAVS).apply(); }
+
+    boolean reducedMotion() { return preferences.getBoolean(REDUCED_MOTION, false); }
+
+    void setReducedMotion(boolean enabled) {
+        preferences.edit().putBoolean(REDUCED_MOTION, enabled).apply();
+    }
 
     Set<String> hidden() {
         return new HashSet<>(preferences.getStringSet(HIDDEN, Collections.emptySet()));

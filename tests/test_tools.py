@@ -110,6 +110,7 @@ class Device:
         self.tv_input = 'com.test.input/.Input'
         self.accessibility = 'null'
         self.vpn = 'null'
+        self.wifi_report = 'Wi-Fi network configurations: none'
 
     def shell(self, command):
         if command == 'am get-current-user':
@@ -132,6 +133,8 @@ class Device:
             return self.accessibility
         if command == 'settings --user 0 get secure always_on_vpn_app':
             return self.vpn
+        if command == 'dumpsys wifi':
+            return self.wifi_report
         if command.startswith('dumpsys package '):
             package = command.split()[-1]
             if package not in self.states:
@@ -192,6 +195,24 @@ class DebloatTests(unittest.TestCase):
         snapshot = debloat.plan(self.dev, ['com.test.first'])
         self.assertEqual(snapshot['packages'][0]['state'], 0)
         self.assertEqual(self.dev.writes, [])
+        self.assertFalse(self.path.exists())
+
+    def test_wifi_provisioning_guard_fails_closed_without_exposing_network(self):
+        candidate = 'com.google.android.tungsten.setupwraith'
+        self.dev.states[candidate] = 0
+        self.dev.wifi_report = 'SSID="Home secret" creatorName=' + candidate
+        with self.assertRaisesRegex(ValueError, 'red Wi-Fi guardada') as error:
+            debloat.plan(self.dev, [candidate])
+        self.assertNotIn('Home secret', str(error.exception))
+        self.assertEqual(self.dev.writes, [])
+        self.dev.wifi_report = ''
+        with self.assertRaisesRegex(ValueError, 'No se pudo comprobar'):
+            debloat.plan(self.dev, [candidate])
+        self.dev.wifi_report = 'cname=com.other.provisioner'
+        snapshot = debloat.plan(self.dev, [candidate])
+        self.dev.wifi_report = 'cname=' + candidate
+        with self.assertRaisesRegex(ValueError, 'red Wi-Fi guardada'):
+            debloat.apply(self.dev, snapshot, self.path)
         self.assertFalse(self.path.exists())
 
     def test_protects_all_homes_keyboards_and_core(self):

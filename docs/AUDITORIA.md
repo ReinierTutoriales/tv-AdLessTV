@@ -6,7 +6,7 @@ Revisión estática del código y de la interfaz. La imagen de referencia aporta
 
 | Elemento | Estado | Criterio |
 | --- | --- | --- |
-| Cabecera con reloj y accesos | Implementado | Reloj local, entradas disponibles, red validada y ajustes; sin consultas de tiempo ni servicios de fondo. |
+| Cabecera con reloj y accesos | Implementado | Reloj local, entradas disponibles, acceso a ajustes de Wi-Fi y ajustes; sin observar el estado de red ni ejecutar servicios de fondo. |
 | Zona destacada | Implementado inicialmente | El nombre cambia con el foco; Abrir e Información funcionan sobre la selección. Queda comprobar escala, recorte y navegación con mando en los dos emuladores y una TV. |
 | Tarjetas redondeadas y foco | Implementado inicialmente | Borde visible y animación corta. El arte procede de los APK instalados, con caché acotada; ninguna imagen se descarga. |
 | Catálogo de instaladas | Implementado | Una entrada por paquete, favoritos opcionales y lista completa desplazable. No hay recomendaciones ni contenido remoto. |
@@ -20,6 +20,8 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 - La sintaxis Bash de los dos scripts se comprueba por separado en CI; `bash -n archivo1 archivo2` no valida ambos.
 - Python mínimo 3.11; 3.10 terminó soporte el 1 de octubre de 2026.
 - `com.android.tv.settings` queda protegido en la lista básica de debloat. Algunos fabricantes usan otros paquetes: inventariar antes de aplicar.
+- El debloat comprueba la configuración Wi-Fi antes de desactivar un paquete conocido de provisión. Si aparece como creador de la red guardada o no se puede leer la información, cancela sin registrar nombres de red en el respaldo. Se vuelve a consultar justo antes de modificarlo; los formatos de `dumpsys wifi` varían según el fabricante y no justifican una promesa universal.
+- Las carátulas opacas se renderizan en RGB_565 (115 200 bytes por tarjeta de 320 × 180) y el resultado se incorpora a la caché únicamente si la petición aún pertenece a la generación actual. Las peticiones anteriores se cancelan al cambiar el catálogo. La opción local «Reducir movimiento» quita la escala animada del foco sin ocultar su borde.
 - El acceso directo a Wi-Fi ya no consulta la red ni necesita `ACCESS_NETWORK_STATE`. Los APK debug y release solo pueden declarar el permiso interno `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` que protege receptores dinámicos; no concede acceso a la red.
 - El ZIP del wrapper Gradle 9.8.1 se valida con su SHA-256 oficial; el JAR presente coincide con la suma publicada por Gradle. `gradlew` ya tiene modo Git `100755`.
 

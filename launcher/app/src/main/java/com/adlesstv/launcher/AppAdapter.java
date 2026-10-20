@@ -47,6 +47,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Listener listener;
     private final ArtworkLoader artwork;
     private int columns = 4;
+    private boolean reducedMotion;
     private GridNavigation navigation = new GridNavigation(new boolean[0], 4);
 
     AppAdapter(Context context, Listener listener, ArtworkLoader artwork) {
@@ -90,6 +91,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     void setColumns(int columns) { this.columns = columns; updateNavigation(); }
+    void setReducedMotion(boolean enabled) { reducedMotion = enabled; }
     private void updateNavigation() {
         boolean[] headings = new boolean[items.size()];
         for (int i = 0; i < headings.length; i++) headings[i] = isHeading(i);
@@ -152,7 +154,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         holder.tile.setScaleX(holder.tile.isFocused() ? 1.035f : 1f);
         holder.tile.setScaleY(holder.tile.isFocused() ? 1.035f : 1f);
         holder.tile.setOnFocusChangeListener((v, focused) -> {
-            animateFocus(v, focused);
+            animateFocus(v, focused, reducedMotion);
             if (focused) listener.focused(app);
         });
         holder.tile.setOnKeyListener((v, key, event) -> {
@@ -179,10 +181,13 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     static int dp(Context context, int value) {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
-    static void animateFocus(View view, boolean focused) {
+    static void animateFocus(View view, boolean focused, boolean reducedMotion) {
         view.animate().cancel();
         float scale = focused ? 1.035f : 1f;
-        view.animate().scaleX(scale).scaleY(scale).setDuration(120).start();
+        if (reducedMotion) {
+            view.setScaleX(1f);
+            view.setScaleY(1f);
+        } else view.animate().scaleX(scale).scaleY(scale).setDuration(120).start();
     }
 
     /** Artwork ratio follows the measured span width; no minimum width can overflow a column. */

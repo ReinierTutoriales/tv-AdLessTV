@@ -123,6 +123,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
         adapter = new AppAdapter(this, this, artwork);
+        adapter.setReducedMotion(repository.reducedMotion());
         layout = new GridLayoutManager(this, 4);
         layout.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override public int getSpanSize(int position) {
@@ -386,14 +387,20 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void showSettings() {
         String[] labels = {getString(R.string.show_hidden), getString(R.string.reset_favorites),
+                getString(repository.reducedMotion() ? R.string.motion_enable : R.string.motion_reduce),
                 getString(R.string.default_home), getString(R.string.clock_dream), getString(R.string.settings)};
         new AlertDialog.Builder(this).setTitle(R.string.manage).setItems(labels, (dialog, choice) -> {
             if (choice == 0) showHidden();
             else if (choice == 1) new AlertDialog.Builder(this).setMessage(R.string.confirm_reset)
                     .setPositiveButton(android.R.string.ok, (d, which) -> { repository.resetFavorites(); render(); })
                     .setNegativeButton(android.R.string.cancel, null).show();
-            else if (choice == 2) requestHome();
-            else if (choice == 3) openSettings("android.settings.DREAM_SETTINGS");
+            else if (choice == 2) {
+                boolean reduced = !repository.reducedMotion();
+                repository.setReducedMotion(reduced);
+                adapter.setReducedMotion(reduced);
+            }
+            else if (choice == 3) requestHome();
+            else if (choice == 4) openSettings("android.settings.DREAM_SETTINGS");
             else openSettings(Settings.ACTION_SETTINGS);
         }).show();
     }
