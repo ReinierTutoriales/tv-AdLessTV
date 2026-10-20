@@ -52,11 +52,13 @@ class InventoryTests(unittest.TestCase):
             "pm list packages --user 0": "package:com.test.home\npackage:com.test.ads\n",
             "pm list packages -d --user 0": "package:com.test.ads\n",
             "getprop ro.build.fingerprint": "build/a",
+            "getprop ro.product.device": "YOC",
         }
         with patch.object(inventory, "shell", side_effect=lambda _, command: answers[command]) as query, \
                 patch.object(inventory, "identity", return_value={"serial": "one"}):
             after = inventory.capture(None)
-        self.assertEqual(query.call_count, 3)
+        self.assertEqual(query.call_count, 4)
+        self.assertEqual(after["device_codename"], "YOC")
         before = {**after, "disabled": []}
         self.assertEqual(inventory.compare(before, after)["newly_disabled"], ["com.test.ads"])
         self.assertEqual(inventory.compare(after, before)["reenabled"], ["com.test.ads"])
@@ -79,6 +81,7 @@ class InventoryTests(unittest.TestCase):
             "pm list packages -d --user 0": "package:com.test.disabled\n",
             "pm list packages -s --user 0": "package:com.test.home\npackage:com.test.ads\npackage:com.test.disabled\n",
             "getprop ro.build.fingerprint": "build/a",
+            "getprop ro.product.device": "YOC",
         }
         with patch.object(inventory, "shell", side_effect=lambda _, cmd: answers[cmd]), \
                 patch.object(inventory, "identity", return_value={"serial": "one"}), \
@@ -88,6 +91,32 @@ class InventoryTests(unittest.TestCase):
         check_user.assert_called_once()
         self.assertEqual(result["review"]["protected"], ["com.test.home"])
         self.assertEqual(result["review"]["system_to_review"], ["com.test.ads"])
+
+    def test_catalog_requires_codename_and_prefers_exact_firmware(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            general = root / "general"
+            exact = root / "exact"
+            for path, firmware in ((general, None), (exact, "build/a")):
+                path.mkdir()
+                (path / "candidates.txt").write_text("com.google.android.feedback\n")
+                entry = {"device_codename": "YOC", "candidates": "candidates.txt"}
+                if firmware: entry["firmware"] = firmware
+                (path / "catalog.json").write_text(json.dumps(entry))
+            report = {"device_codename": "YOC", "firmware": "build/a"}
+            self.assertEqual(profile_tool.catalog_list(report, root), exact / "candidates.txt")
+            self.assertEqual(profile_tool.catalog_list({**report, "firmware": "build/b"}, root),
+                             general / "candidates.txt")
+            with self.assertRaisesRegex(ValueError, "identificador"):
+                profile_tool.catalog_list({"firmware": "build/a"}, root)
+            with self.assertRaisesRegex(ValueError, "No hay una lista"):
+                profile_tool.catalog_list({**report, "device_codename": "OTHER"}, root)
+            (general / "catalog.json").write_text(json.dumps(
+                    {"device_codename": "YOC", "candidates": "../exact/candidates.txt"}))
+            with self.assertRaisesRegex(ValueError, "Ruta de candidatos"):
+                profile_tool.catalog_list(report, root)
+        actual = Path(__file__).resolve().parents[1] / "examples"
+        self.assertEqual(profile_tool.catalog_list(report, actual).name, "candidates.txt")
 
 
 if __name__ == "__main__":

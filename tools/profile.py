@@ -51,6 +51,41 @@ MANUAL_REVIEW = {
 }
 
 
+def catalog_list(inventory, directory):
+    """Select a research list by device codename, preferring an exact fingerprint.
+
+    Selection only generates a review-required draft; it never certifies a list.
+    """
+    codename = inventory.get("device_codename")
+    firmware = inventory.get("firmware")
+    if not isinstance(codename, str) or not codename.strip() or not isinstance(firmware, str):
+        raise ValueError("Recaptura el inventario: falta el identificador interno o firmware.")
+    matches = []
+    for manifest in sorted(directory.glob("*/catalog.json")):
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        if (not isinstance(data, dict) or not isinstance(data.get("device_codename"), str)
+                or not isinstance(data.get("candidates"), str)):
+            raise ValueError(f"Entrada de catálogo inválida: {manifest}")
+        name = data["candidates"]
+        if name in ("", ".", "..") or Path(name).name != name:
+            raise ValueError(f"Ruta de candidatos inválida: {manifest}")
+        exact = data.get("firmware")
+        if exact is not None and (not isinstance(exact, str) or not exact.strip()):
+            raise ValueError(f"Firmware de catálogo inválido: {manifest}")
+        if data["device_codename"].casefold() == codename.casefold() and exact in (None, firmware):
+            candidate = manifest.parent / name
+            if candidate.resolve().parent != manifest.parent.resolve() or not candidate.is_file():
+                raise ValueError(f"Falta lista de candidatos: {manifest}")
+            matches.append((exact == firmware, candidate))
+    if not matches:
+        raise ValueError("No hay una lista para este identificador y firmware; usa --list tras revisarla.")
+    prefer_exact = any(exact for exact, _ in matches)
+    best = [path for exact, path in matches if exact == prefer_exact]
+    if len(best) != 1:
+        raise ValueError("Varias listas coinciden con esta TV; selecciona una con --list.")
+    return best[0]
+
+
 def draft(inventory, suggested=()):
     validate(inventory)
     model = inventory["device"].get("model")
@@ -100,18 +135,26 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inventory", type=Path, required=True,
                         help="JSON creado con tools/inventory.py --review")
-    parser.add_argument("--list", type=Path,
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--list", type=Path,
                         help="Lista orientativa adicional: filtrar contra inventario y protecciones")
+    source.add_argument("--catalog", action="store_true",
+                        help="Elegir lista de investigación por identificador interno y firmware")
     parser.add_argument("--output", type=Path, required=True,
                         help="Ruta nueva del borrador; nunca sobrescribe")
     args = parser.parse_args(argv)
     try:
-        suggestions = read_packages(args.list) if args.list else ()
-        data = draft(json.loads(args.inventory.read_text(encoding="utf-8")), suggestions)
+        inventory = json.loads(args.inventory.read_text(encoding="utf-8"))
+        selected = (catalog_list(inventory, Path(__file__).resolve().parents[1] / "examples")
+                    if args.catalog else args.list)
+        suggestions = read_packages(selected) if selected else ()
+        data = draft(inventory, suggestions)
         with args.output.open("x", encoding="utf-8") as stream:
             json.dump(data, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
-        print(f"Borrador: {args.output}; {len(data['packages'])} candidatos y "
+        print(f"Borrador: {args.output}; "
+              + (f"lista orientativa: {selected}; " if selected else "")
+              + f"{len(data['packages'])} candidatos y "
               f"{len(data['manual_review'])} componentes para análisis separado; "
               f"{len(data['excluded'])} excluidos de la lista. "
               "No se cambió ningún paquete.")

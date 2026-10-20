@@ -12,7 +12,7 @@ con los paquetes de sistema habilitados y las protecciones de esa TV:
 python tools/tv.py --probe
 python tools/inventory.py --review --output backups/onn-inventario.json
 python tools/profile.py --inventory backups/onn-inventario.json \
-  --list examples/onn-4k-2023/candidates.txt --output backups/onn-borrador.json
+  --catalog --output backups/onn-borrador.json
 ```
 
 El borrador requiere revisar cada motivo antes de cambiar `review_required` a
