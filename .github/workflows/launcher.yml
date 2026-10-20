@@ -52,6 +52,20 @@ jobs:
               exit 1
             fi
           done
+      - name: Exercise local release signing with an ephemeral CI key
+        working-directory: launcher
+        run: |
+          keytool -genkeypair -noprompt -keystore ci-release.jks -storepass testpassword -keypass testpassword \
+            -alias ci-test -dname 'CN=AdLessTV CI Test' -keyalg RSA -keysize 2048 -validity 365
+          cat > keystore.properties <<'EOF'
+          storeFile=ci-release.jks
+          storePassword=testpassword
+          keyAlias=ci-test
+          keyPassword=testpassword
+          EOF
+          ./gradlew --no-daemon :app:assembleRelease
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
+          rm -f ci-release.jks keystore.properties
       - uses: actions/upload-artifact@v4
         with:
           name: AdLessTV-debug-apk

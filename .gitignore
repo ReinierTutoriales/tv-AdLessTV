@@ -4,6 +4,9 @@ venv/
 .venv/
 tools/adbkey*
 launcher/local.properties
+launcher/keystore.properties
+*.jks
+*.keystore
 launcher/app/build/
 *.apk
 .DS_Store

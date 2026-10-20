@@ -20,6 +20,10 @@ class InstallTests(unittest.TestCase):
             gradle = launcher / 'gradlew'
             gradle.write_text('#!/bin/sh\nexit 0\n')
             gradle.chmod(0o700)
+            release = launcher / 'app/build/outputs/apk/release/app-release.apk'
+            release.parent.mkdir(parents=True)
+            release.write_bytes(b'signed release fixture')
+            (launcher / 'keystore.properties').write_text('fixture')
             client = root / 'python-client'
             client.write_text('''#!/usr/bin/env python3
 import json, os, sys
@@ -33,7 +37,7 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
             client.chmod(0o700)
             capture = root / 'calls.jsonl'
             environment = {**os.environ, 'PYTHON': str(client), 'TV_HOST': '192.0.2.1', 'TEST_CAPTURE': str(capture)}
-            command = ['bash', str(launcher / script.name), '--make-home', 'backups/home.json',
+            command = ['bash', str(launcher / script.name), '--release', '--make-home', 'backups/home.json',
                        '--replace-stock', 'com.factory.home']
             success = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True)
             self.assertEqual(success.returncode, 0, success.stderr)
@@ -52,6 +56,22 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
                                        capture_output=True, text=True)
             self.assertNotEqual(bad_start.returncode, 0)
             self.assertNotIn('--activate', capture.read_text())
+
+    def test_home_requires_signed_release_before_build_or_adb(self):
+        script = Path(__file__).resolve().parents[1] / 'launcher' / 'build-and-install.sh'
+        with tempfile.TemporaryDirectory() as directory:
+            launcher = Path(directory) / 'launcher'
+            launcher.mkdir()
+            shutil.copy(script, launcher / script.name)
+            result = subprocess.run(['bash', str(launcher / script.name), '--make-home', 'home.json'],
+                                    cwd=directory, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('--release', result.stderr)
+            result = subprocess.run(['bash', str(launcher / script.name), '--release',
+                                     '--make-home', 'home.json'], cwd=directory,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('keystore.properties', result.stderr)
 
 
 if __name__ == '__main__': unittest.main()
