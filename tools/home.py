@@ -7,7 +7,8 @@ from pathlib import Path
 import re
 import sys
 
-from debloat import CORE, PACKAGE, identity, package_state, require_user_zero, write_snapshot
+from debloat import (CORE, PACKAGE, check_wifi_provisioning, identity, package_state,
+                     require_user_zero, write_snapshot)
 from tv import RemoteError, connect, shell
 
 NEW_HOME = "com.adlesstv.launcher/.MainActivity"
@@ -129,6 +130,7 @@ def activate(device, snapshot_path, stock_package=None):
         raise ValueError("Indica el paquete HOME anterior exacto y no protegido.")
     if stock_package is not None:
         check_replacement_claimants(device, previous)
+        check_wifi_provisioning(device, [stock_package])
     original_state = package_state(device, previous.split("/", 1)[0])
     if original_state not in (0, 1):
         raise ValueError("El HOME anterior no está habilitado; no se modificará.")
@@ -200,6 +202,9 @@ def disable_stock(device, snapshot_path, expected_package):
     if current_home(device) not in (NEW_HOME, data["previous"]):
         raise ValueError("Se seleccionó un HOME diferente; no se reemplazará.")
     check_replacement_claimants(device, data["previous"])
+    # This path must enforce the same Wi-Fi ownership guard as debloat. On some
+    # firmware disabling the setup owner deletes the saved network immediately.
+    check_wifi_provisioning(device, [stock])
     if package_state(device, stock) != data["previous_state"]:
         raise ValueError("Cambió el estado del HOME anterior; no se desactivará.")
     if not launched_successfully(shell(device, "am start -W -n " + NEW_HOME)):

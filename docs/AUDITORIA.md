@@ -21,13 +21,14 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 - Python mínimo 3.11; 3.10 terminó soporte el 1 de octubre de 2026.
 - `com.android.tv.settings` queda protegido en la lista básica de debloat. Algunos fabricantes usan otros paquetes: inventariar antes de aplicar.
 - El debloat comprueba la configuración Wi-Fi antes de desactivar un paquete conocido de provisión. Si aparece como creador de la red guardada o no se puede leer la información, cancela sin registrar nombres de red en el respaldo. Se vuelve a consultar justo antes de modificarlo; los formatos de `dumpsys wifi` varían según el fabricante y no justifican una promesa universal.
+- La sustitución opcional del HOME anterior usa la misma comprobación Wi-Fi, tanto antes de cambiar HOME como inmediatamente antes de desactivar el paquete. Si el paquete creó una red guardada o el estado no puede determinarse, no se desactiva. El flujo ordinario deja el HOME anterior habilitado.
 - Las carátulas opacas se renderizan en RGB_565 (73 728 bytes por tarjeta de 256 × 144) y el resultado se incorpora a la caché únicamente si la petición aún pertenece a la generación actual. Las peticiones anteriores se cancelan al cambiar el catálogo. La opción local «Reducir movimiento» quita la escala animada del foco sin ocultar su borde.
 - El acceso directo a Wi-Fi ya no consulta la red ni necesita `ACCESS_NETWORK_STATE`. Los APK debug y release solo pueden declarar el permiso interno `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` que protege receptores dinámicos; no concede acceso a la red.
 - El ZIP del wrapper Gradle 9.8.1 se valida con su SHA-256 oficial; el JAR presente coincide con la suma publicada por Gradle. `gradlew` ya tiene modo Git `100755`.
 
 ## Pendientes con evidencia insuficiente
 
-1. Compilar y ejecutar los tests de interfaz y HOME tras esta modificación; comprobar 960 × 540 y 720 × 480, fuente 1,3, foco, recorte, retorno y arranque. Una prueba de Python no compila Java ni recursos.
+1. Las pruebas de compilación, lint e interfaz pasaron en los emuladores de TV API 34 y Android API 35 para el cambio visual anterior; repetir la matriz al publicar cada nueva modificación. Las capturas cubren 960 × 540 y 720 × 480, pero no prueban fluidez ni todos los mandos.
 2. Repetir en una TV concreta la activación HOME, dos reinicios, HDMI, mando y restauración. El firmware puede imponer su lanzador y la prueba de emulador no lo predice.
 3. Medir inicio en frío, memoria máxima y frames perdidos antes y después de cambiar tamaños de arte o caché. Los 4 MiB / 2 MiB actuales son límites, no una mejora de rendimiento demostrada.
 4. Investigar la disponibilidad de `platforms;android-37.x` en el SDK usado por CI y después probar API 37. El fallo previo de `platforms;android-37` no demuestra cuál es el identificador correcto ni justifica cambiar `targetSdk` sin ensayo.
