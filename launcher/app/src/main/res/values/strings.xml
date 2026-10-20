@@ -30,4 +30,6 @@
     <string name="home_role_not_selected">El sistema concedió el rol de inicio, pero sigue abriendo otro lanzador. Comprueba la aplicación de inicio en Ajustes. Si el televisor impone su lanzador, la activación por ADB requiere revisar y respaldar el paquete exacto.</string>
     <string name="open_home_settings">Abrir ajustes de inicio</string>
     <string name="confirm_reset">¿Restablecer el orden inicial de favoritos?</string>
+    <string name="motion_reduce">Reducir movimiento</string>
+    <string name="motion_enable">Activar movimiento</string>
 </resources>

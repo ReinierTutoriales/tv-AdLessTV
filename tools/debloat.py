@@ -24,6 +24,28 @@ CORE = {"android", "com.adlesstv.launcher", "com.android.systemui", "com.android
         "com.android.inputdevices", "com.android.bluetooth", "com.android.networkstack",
         "com.google.android.networkstack", "com.android.permissioncontroller",
         "com.google.android.permissioncontroller"}
+WIFI_PROVISIONERS = {"com.google.android.tungsten.setupwraith"}
+
+
+def check_wifi_provisioning(dev, packages):
+    """Avoid removing the owner of a saved Wi-Fi network on affected TV firmware.
+
+    dumpsys formats vary by vendor; an unreadable report blocks this sensitive
+    package rather than guessing whether ADB will still be reachable afterwards.
+    Do not persist the report: it can contain SSIDs and network identifiers.
+    """
+    candidates = set(packages) & WIFI_PROVISIONERS
+    if not candidates:
+        return
+    report = shell(dev, "dumpsys wifi")
+    if not report.strip() or "Permission Denial" in report:
+        raise ValueError("No se pudo comprobar la configuración Wi-Fi; no se tocará el paquete de provisión.")
+    creators = set(re.findall(r"\b(?:cname|creatorName)\s*=\s*([A-Za-z_][A-Za-z0-9_.]*)", report))
+    blocked = creators & candidates
+    if blocked:
+        raise ValueError("Un paquete de provisión creó una red Wi-Fi guardada: "
+                         + ", ".join(sorted(blocked))
+                         + ". Mantén ese paquete activo mientras dependa de esa red.")
 
 
 def read_packages(path):
@@ -136,6 +158,7 @@ def write_snapshot(path, data):
 
 def plan(dev, packages):
     require_user_zero(dev)
+    check_wifi_provisioning(dev, packages)
     firmware = shell(dev, "getprop ro.build.fingerprint").strip()
     if not firmware:
         raise ValueError("No se pudo identificar el firmware; se cancela la planificación.")
@@ -154,6 +177,7 @@ def plan(dev, packages):
 def apply(dev, snapshot, path):
     path = Path(path)
     require_user_zero(dev)
+    check_wifi_provisioning(dev, [entry["package"] for entry in snapshot["packages"]])
     blocked = {entry["package"] for entry in snapshot["packages"]} & protected_packages(dev)
     if blocked:
         raise ValueError("Cambió la protección de estos paquetes: " + ", ".join(sorted(blocked)))
@@ -173,6 +197,7 @@ def apply(dev, snapshot, path):
         os.fsync(stream.fileno())
     for entry in snapshot["packages"]:
         require_user_zero(dev)
+        check_wifi_provisioning(dev, [entry["package"]])
         if entry["package"] in protected_packages(dev):
             raise ValueError(f"{entry['package']} pasó a cumplir una función protegida. "
                              "Conserva el respaldo y revisa la TV antes de continuar.")
