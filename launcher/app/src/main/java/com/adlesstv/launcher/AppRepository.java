@@ -109,12 +109,10 @@ final class AppRepository {
                 }
             }
         }
-        // A useful dock even when none of the configured apps is installed.
-        if (result.isEmpty()) {
-            for (App app : all) {
-                if (result.size() == 4) break;
-                result.add(app.key());
-            }
+        // Fill missing default slots with installed apps; user choices above remain exact.
+        for (App app : all) {
+            if (result.size() >= 4) break;
+            if (!result.contains(app.key())) result.add(app.key());
         }
         return result;
     }
