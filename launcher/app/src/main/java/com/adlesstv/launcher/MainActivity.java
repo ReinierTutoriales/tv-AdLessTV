@@ -72,6 +72,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private ArtworkLoader artwork;
     private RecyclerView grid;
     private View catalogContainer;
+    private View idleSpacer;
     private RecyclerView dock;
     private GridLayoutManager layout;
     private TextView empty;
@@ -112,6 +113,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         });
         grid = findViewById(R.id.grid);
         catalogContainer = findViewById(R.id.catalog_container);
+        idleSpacer = findViewById(R.id.idle_spacer);
         dock = findViewById(R.id.dock);
         empty = findViewById(R.id.empty);
         inputs = findViewById(R.id.action_inputs);
@@ -131,10 +133,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         heroOpen.setOnKeyListener((v, key, event) -> heroKey(key, event));
         heroInfo.setOnKeyListener((v, key, event) -> heroKey(key, event));
         if (Build.VERSION.SDK_INT >= 33) {
-            backCallback = () -> {
-                pendingGridPosition = RecyclerView.NO_POSITION;
-                settings.requestFocus();
-            };
+            backCallback = this::returnToDock;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
@@ -329,6 +328,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void focusDock(int position) {
         catalogContainer.setVisibility(View.GONE);
+        idleSpacer.setVisibility(View.VISIBLE);
         if (position < 0 || position >= dockAdapter.getItemCount()) {
             heroOpen.requestFocus(); return;
         }
@@ -353,6 +353,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         // A newly visible RecyclerView may not have laid out its children yet;
         // applyPendingFocus completes the handoff after layout.
         catalogContainer.setVisibility(View.VISIBLE);
+        idleSpacer.setVisibility(View.GONE);
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
@@ -649,9 +650,22 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private void toast(int resource) { Toast.makeText(this, resource, Toast.LENGTH_SHORT).show(); }
 
     // Android 13+ uses OnBackInvokedCallback; older TV versions still dispatch here.
+    private void returnToDock() {
+        pendingGridPosition = RecyclerView.NO_POSITION;
+        if (catalogContainer.getVisibility() == View.VISIBLE && dockAdapter.firstApp() >= 0) {
+            int previous = dockAdapter.indexOf(lastFocused);
+            focusDock(previous >= 0 ? previous : dockAdapter.firstApp());
+        } else if (dockAdapter.firstApp() >= 0) {
+            focusDock(dockAdapter.firstApp());
+        } else {
+            catalogContainer.setVisibility(View.GONE);
+            idleSpacer.setVisibility(View.VISIBLE);
+            settings.requestFocus();
+        }
+    }
+
     @SuppressLint("GestureBackNavigation")
     @Override public void onBackPressed() {
-        pendingGridPosition = RecyclerView.NO_POSITION;
-        settings.requestFocus();
+        returnToDock();
     }
 }
