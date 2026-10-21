@@ -41,12 +41,11 @@
 # - The remote's source button was captured with getevent on
 #   "MStar Smart TV IR Receiver": MSC_SCAN 0040bf5b and linux KEY_G (scan 34),
 #   19 times across 6 presses because the IR code repeats. It is not KEYCODE_TV,
-#   which is why the button did nothing at first. On the author's branch (a separate
-#   launcher change, not on main yet), treating KEYCODE_G / scan 34 from that IR
-#   device as the Inputs button made one press on the home screen open the Inputs menu. Confirmed by the person
-#   holding the remote. Not rechecked from inside another app. A keyboard G is
-#   not consumed. sendevent on the IR device is denied to the shell, so the
-#   press could not be injected.
+#   which is why the button did nothing at first. This vendor mapping is not enabled by default.
+#   Verify the physical key code before configuring the optional input key mapping; enabling a
+#   keyboard key globally can also affect a connected keyboard. The shell cannot inject a press
+#   on that IR device, so injected input does not validate the physical remote.
+
 #
 # KEEP, even though some names look like bloat:
 # - com.homwee.dmt.upgrade: firmware updates. com.homwee.upgrade below is the

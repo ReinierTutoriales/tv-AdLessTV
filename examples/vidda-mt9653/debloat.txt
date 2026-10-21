@@ -31,9 +31,9 @@
 #
 # Remote Home key: the physical button is Linux scancode 102, but the keylayout maps it to
 # KEYCODE_F12 (142), and the vendor SysUIMerge app used that to switch to the previous app — which was
-# the stock launcher until it got disabled, so Home stopped working. WARNING: the fix the author tested
-# (a home_key_scancodes=[102] option for HomeKeyService) is not in the launcher on main yet, so with the
-# stock launcher disabled the remote's Home button does nothing until that option lands. Injected
+# the stock launcher until it got disabled, so Home stopped working. With the stock launcher
+# disabled, verify the physical Home button on this firmware before continuing; a scancode-based
+# workaround is not provided by the current launcher.
 # KEYCODE_HOME cannot test it: the vendor framework swallows injected keycode 3 and the scancode is 0.
 #
 # Second vendor home: com.keylab.speech.view.vidaa hosts com.ju.secondscreen.HomeActivity, started by
