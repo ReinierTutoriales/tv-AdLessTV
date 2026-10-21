@@ -327,6 +327,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void focusDock(int position) {
+        catalogContainer.animate().cancel();
+        catalogContainer.setAlpha(1f);
         catalogContainer.setVisibility(View.GONE);
         idleSpacer.setVisibility(View.VISIBLE);
         if (position < 0 || position >= dockAdapter.getItemCount()) {
@@ -352,8 +354,16 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         // Reveal the catalog only when a valid app can receive focus.
         // A newly visible RecyclerView may not have laid out its children yet;
         // applyPendingFocus completes the handoff after layout.
-        catalogContainer.setVisibility(View.VISIBLE);
+        boolean openingCatalog = catalogContainer.getVisibility() != View.VISIBLE;
+        catalogContainer.animate().cancel();
         idleSpacer.setVisibility(View.GONE);
+        catalogContainer.setVisibility(View.VISIBLE);
+        if (openingCatalog && !repository.reducedMotion()) {
+            catalogContainer.setAlpha(0f);
+            catalogContainer.animate().alpha(1f).setDuration(180).start();
+        } else {
+            catalogContainer.setAlpha(1f);
+        }
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
