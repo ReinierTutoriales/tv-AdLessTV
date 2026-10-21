@@ -11,7 +11,7 @@ import sys
 from debloat import identity, protected_packages, require_user_zero
 from tv import connect, shell
 
-PACKAGE_LINE = re.compile(r"package:([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)")
+PACKAGE_LINE = re.compile(r"package:(android|[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)")
 
 
 def packages(output):

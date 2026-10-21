@@ -127,7 +127,7 @@ def require_user_zero(dev):
                          " No se aplicará un plan a otra sesión de TV.")
 
 
-def protected_packages(dev):
+def protected_packages(dev, *, include_home=True):
     homes = shell(dev, "cmd package query-activities --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME")
     home_packages = {match[1] for match in COMPONENT.finditer(homes)}
     if not home_packages:
@@ -145,7 +145,7 @@ def protected_packages(dev):
     vpn = shell(dev, "settings --user 0 get secure always_on_vpn_app").strip()
     if vpn.lower() not in ("", "null") and not PACKAGE.fullmatch(vpn):
         raise ValueError("No se pudo interpretar el paquete de VPN permanente.")
-    return CORE | home_packages | keyboard_packages | input_packages | accessibility_packages | ({vpn} if PACKAGE.fullmatch(vpn) else set())
+    return CORE | (home_packages if include_home else set()) | keyboard_packages | input_packages | accessibility_packages | ({vpn} if PACKAGE.fullmatch(vpn) else set())
 
 
 def write_snapshot(path, data):

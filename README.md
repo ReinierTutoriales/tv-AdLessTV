@@ -6,6 +6,15 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 
 **Estado:** hay un proyecto Android compilable y scripts de instalación. El cambio de HOME requiere una operación separada con respaldo. El lanzador original permanece habilitado.
 
+## Instalación completa desde el APK en Windows
+
+El artefacto `AdLessTV-debug-apk` incluye `install-apk.ps1` y las herramientas de
+configuración. Con Python 3.11+ y ADB, `-MakeHome` instala el APK, prepara un plan,
+respalda y reemplaza los componentes HOME conocidos que compiten con AdLessTV.
+No requiere compilar ni instalar dependencias Python con el transporte ADB nativo.
+[Instrucciones, comprobación tras reinicio y restauración](docs/INSTALAR_APK.md).
+
+
 ## Funciones disponibles
 
 - Inicio adaptable: una cuadrícula desplazable con favoritos al principio, tarjetas con proporción fija, reloj y accesos compactos; D-pad y clic del mando.

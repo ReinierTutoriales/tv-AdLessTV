@@ -79,3 +79,25 @@ Para aceptar el dispositivo físico se deben ejecutar las pruebas de
 [PRUEBA_ONN.md](PRUEBA_ONN.md): instalación, navegación y regreso desde apps,
 reinicios y suspensión, memoria/frames con la misma secuencia, Wi-Fi, mando y
 restauración. La foto del APK anterior no valida esta nueva revisión.
+
+## Cierre del flujo de instalación HOME
+
+La revisión de persistencia detectó una diferencia adicional: la ruta antigua
+solo admitía un HOME anterior y bloqueaba cualquier segundo competidor. El motor
+`tools/home_setup.py` permite planificar juntos los launchers Google TV conocidos
+y el asistente que puede recuperarlos; conserva estado original, identidad,
+fingerprint y diario por paquete. Revalida antes de aplicar y antes de cada
+modificación; restaura tras fallos o permite reanudar la recuperación después de
+una desconexión. Un propietario Wi-Fi dependiente o un HOME desconocido bloquean
+el reemplazo antes de modificar la selección.
+
+`launcher/install-apk.ps1` usa el APK ya compilado y Platform-Tools. El paquete CI
+incluye ambos y las herramientas Python sin exigir pip para el transporte ADB
+nativo. `-MakeHome` realiza la configuración completa; `-PlanOnly` muestra el plan.
+El respaldo y los scripts ejecutables de verificar/restaurar se preparan antes de
+cambiar HOME. Véase [INSTALAR_APK.md](INSTALAR_APK.md).
+
+También se corrigió el inventario para admitir `package:android`, el paquete del
+framework que Android devuelve realmente junto a los nombres con puntos. El
+respaldo múltiple tiene versión 3 y se maneja con `home_setup.py`; los respaldos
+anteriores conservan su herramienta original.

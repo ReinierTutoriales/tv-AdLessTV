@@ -1,5 +1,11 @@
 # Prueba controlada en onn 4K (2 GB RAM, 8 GB nominales)
 
+Para probar un APK ya compilado en Windows, utiliza primero el
+[instalador del paquete](INSTALAR_APK.md). Incluye una ruta HOME para varios
+competidores y scripts de verificación/recuperación. El flujo siguiente de
+compilación local sigue disponible para conservar una firma release propia.
+
+
 Esta guía recoge observaciones del dispositivo concreto. Un emulador no prueba su firmware, el mando ni la persistencia tras apagar. Conserva los respaldos privados; pueden contener identificadores del dispositivo. No publiques la clave de firma ni los inventarios.
 
 ## 1. Preparar la identidad y el estado inicial

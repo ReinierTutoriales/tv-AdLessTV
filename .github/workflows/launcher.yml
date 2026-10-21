@@ -81,12 +81,18 @@ jobs:
           ./gradlew --no-daemon :app:assembleRelease
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
           rm -f ci-release.jks keystore.properties
+      - name: Package APK with the prebuilt installer and recovery tools
+        run: |
+          mkdir -p launcher-bundle/tools
+          cp launcher/app/build/outputs/apk/debug/app-debug.apk launcher-bundle/
+          cp launcher/install-apk.ps1 launcher-bundle/
+          cp tools/{home_setup,home,debloat,inventory,tv}.py launcher-bundle/tools/
+          cp -r apk-evidence launcher-bundle/
+          cp docs/INSTALAR_APK.md launcher-bundle/LEEME.md
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: AdLessTV-debug-apk
-          path: |
-            launcher/app/build/outputs/apk/debug/app-debug.apk
-            apk-evidence/
+          path: launcher-bundle/
           retention-days: 7
 
   ui:
