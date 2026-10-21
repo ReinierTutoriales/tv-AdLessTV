@@ -362,12 +362,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (!resumed) return;
         if (pendingDockPosition >= 0) {
             RecyclerView.ViewHolder tile = dock.findViewHolderForAdapterPosition(pendingDockPosition);
-            if (tile != null) tile.itemView.requestFocus();
+            if (tile != null && tile.itemView.requestFocus()) pendingDockPosition = RecyclerView.NO_POSITION;
             return;
         }
         if (pendingGridPosition < 0) return;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(pendingGridPosition);
-        if (holder != null) holder.itemView.requestFocus();
+        if (holder != null && holder.itemView.requestFocus()) pendingGridPosition = RecyclerView.NO_POSITION;
     }
 
     @Override public void focused(AppRepository.App app) {
