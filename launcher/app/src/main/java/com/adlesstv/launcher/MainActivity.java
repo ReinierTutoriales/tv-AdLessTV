@@ -71,6 +71,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private AppAdapter dockAdapter;
     private ArtworkLoader artwork;
     private RecyclerView grid;
+    private View catalogContainer;
     private RecyclerView dock;
     private GridLayoutManager layout;
     private TextView empty;
@@ -110,6 +111,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             if (selectedApp != null && selectedApp.key().equals(app.key())) updateHero();
         });
         grid = findViewById(R.id.grid);
+        catalogContainer = findViewById(R.id.catalog_container);
         dock = findViewById(R.id.dock);
         empty = findViewById(R.id.empty);
         inputs = findViewById(R.id.action_inputs);
@@ -326,13 +328,17 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void focusDock(int position) {
+        catalogContainer.setVisibility(View.GONE);
         if (position < 0 || position >= dockAdapter.getItemCount()) {
             heroOpen.requestFocus(); return;
         }
         pendingGridPosition = RecyclerView.NO_POSITION;
         pendingDockPosition = position;
         RecyclerView.ViewHolder holder = dock.findViewHolderForAdapterPosition(position);
-        if (holder != null && holder.itemView.requestFocus()) return;
+        if (holder != null && holder.itemView.requestFocus()) {
+            pendingDockPosition = RecyclerView.NO_POSITION;
+            return;
+        }
         dock.scrollToPosition(position);
         dock.post(this::applyPendingFocus);
     }
@@ -343,10 +349,17 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             else settings.requestFocus();
             return;
         }
+        // Reveal the catalog only when a valid app can receive focus.
+        // A newly visible RecyclerView may not have laid out its children yet;
+        // applyPendingFocus completes the handoff after layout.
+        catalogContainer.setVisibility(View.VISIBLE);
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
-        if (holder != null && holder.itemView.requestFocus()) return;
+        if (holder != null && holder.itemView.requestFocus()) {
+            pendingGridPosition = RecyclerView.NO_POSITION;
+            return;
+        }
         grid.scrollToPosition(position == adapter.firstApp() ? 0 : position);
         grid.post(this::applyPendingFocus);
     }
@@ -355,12 +368,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (!resumed) return;
         if (pendingDockPosition >= 0) {
             RecyclerView.ViewHolder tile = dock.findViewHolderForAdapterPosition(pendingDockPosition);
-            if (tile != null) tile.itemView.requestFocus();
+            if (tile != null && tile.itemView.requestFocus()) pendingDockPosition = RecyclerView.NO_POSITION;
             return;
         }
         if (pendingGridPosition < 0) return;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(pendingGridPosition);
-        if (holder != null) holder.itemView.requestFocus();
+        if (holder != null && holder.itemView.requestFocus()) pendingGridPosition = RecyclerView.NO_POSITION;
     }
 
     @Override public void focused(AppRepository.App app) {
