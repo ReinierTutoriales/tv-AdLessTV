@@ -43,6 +43,11 @@ public class HomeUiTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
             waitForCatalog(scenario);
             scenario.onActivity(activity -> {
+                // Keep a catalog pane open while a toolbar action owns focus.
+                activity.findViewById(R.id.catalog_container).setVisibility(View.VISIBLE);
+                activity.findViewById(R.id.dock).setVisibility(View.GONE);
+            });
+            scenario.onActivity(activity -> {
                 assertTrue(activity.findViewById(R.id.action_settings).requestFocus());
                 try {
                     ((android.content.BroadcastReceiver) changes.get(activity)).onReceive(activity,
@@ -54,8 +59,11 @@ public class HomeUiTest {
                 try { return !scanning.getBoolean(activity); }
                 catch (IllegalAccessException error) { throw new AssertionError(error); }
             });
-            scenario.onActivity(activity -> assertEquals(activity.findViewById(R.id.action_settings),
-                    activity.getCurrentFocus()));
+            scenario.onActivity(activity -> {
+                assertEquals(activity.findViewById(R.id.action_settings), activity.getCurrentFocus());
+                assertEquals("An input/package refresh must not reveal the dock over an open catalog",
+                        View.GONE, activity.findViewById(R.id.dock).getVisibility());
+            });
         }
     }
 

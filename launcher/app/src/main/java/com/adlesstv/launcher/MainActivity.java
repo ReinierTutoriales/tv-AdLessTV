@@ -314,8 +314,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         resumed = true;
         if (artworkReleased) {
             artworkReleased = false;
-            adapter.notifyDataSetChanged();
-            dockAdapter.notifyDataSetChanged();
+            adapter.notifyItemRangeChanged(0, adapter.getItemCount());
+            dockAdapter.notifyItemRangeChanged(0, dockAdapter.getItemCount());
         }
         updateMemory();
         if (config.showNetworkPill) networkStatus.start();
@@ -454,7 +454,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             if (!hidden.contains(app.packageName()) && !pinnedKeys.contains(app.key())) rest.add(app);
         }
         dockAdapter.replace(pinned, Collections.emptyList());
-        dock.setVisibility(pinned.isEmpty() ? View.GONE : View.VISIBLE);
+        setCatalogMode(catalogContainer.getVisibility() == View.VISIBLE && !pinned.isEmpty());
         List<AppRepository.App> allowedCards = new ArrayList<>();
         for (AppRepository.App card : cards) if (repository.cardDecision(card.cardKey) > 0) allowedCards.add(card);
         adapter.replace(Collections.emptyList(), rest, tvInputs, allowedCards);
