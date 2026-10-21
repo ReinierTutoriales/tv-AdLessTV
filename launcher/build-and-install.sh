@@ -53,6 +53,6 @@ if [[ -n "$HOME_SNAPSHOT" ]]; then
   mkdir -p "$(dirname -- "$HOME_SNAPSHOT")"
   home_args=(--activate "$HOME_SNAPSHOT")
   if [[ -n "$STOCK_PACKAGE" ]]; then home_args+=(--stock-package "$STOCK_PACKAGE"); fi
-  "$PY" "$ROOT/../tools/home.py" "${home_args[@]}"
-  printf 'Reinicia la TV y verifica con: tools/home.py --verify-reboot %s\n' "$HOME_SNAPSHOT"
+  "$PY" "$ROOT/../tools/setup.py" "${home_args[@]}"
+  printf 'Reinicia la TV y verifica con: tools/setup.py --verify-reboot %s\n' "$HOME_SNAPSHOT"
 else printf 'Vista previa instalada. Para elegir HOME usa --make-home <respaldo-nuevo.json>.\n'; fi
