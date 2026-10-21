@@ -21,9 +21,10 @@ import java.util.concurrent.Future;
 
 /** Local artwork only: bounded bitmap cache, cancellable worker loads, no PackageManager I/O in bind. */
 final class ArtworkLoader {
-    private static final int WIDTH = 256;
-    private static final int HEIGHT = 144;
+    private static final int WIDTH = 96;
+    private static final int HEIGHT = 96;
     interface Listener { void loaded(AppRepository.App app); }
+    interface AccentTarget { void loaded(int color); }
 
     private static final class Artwork {
         final Bitmap bitmap;
@@ -51,13 +52,14 @@ final class ArtworkLoader {
         };
     }
 
-    void bind(ImageView view, AppRepository.App app) {
+    void bind(ImageView view, AppRepository.App app, AccentTarget target) {
         cancel(view);
         final int generation = revision;
         final String key = app.key() + ":" + generation;
         view.setTag(key);
         Artwork ready = cache.get(key);
         view.setImageBitmap(ready == null ? null : ready.bitmap);
+        target.loaded(ready == null ? 0 : ready.accent);
         if (ready != null || closed) return;
         Future<?> request = workers.submit(() -> {
             if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
@@ -68,6 +70,7 @@ final class ArtworkLoader {
                     cache.put(key, result);
                     view.setImageBitmap(result.bitmap);
                     requests.remove(view);
+                    target.loaded(result.accent);
                     listener.loaded(app);
                 }
             });
@@ -80,11 +83,17 @@ final class ArtworkLoader {
         return ready == null ? 0 : ready.accent;
     }
 
+    Bitmap icon(AppRepository.App app) {
+        Artwork ready = cache.get(app.key() + ":" + revision);
+        return ready == null ? null : ready.bitmap;
+    }
+
     private static int sampleAccent(Bitmap bitmap) {
         int accent = 0, best = 0;
-        for (int y = 15; y < bitmap.getHeight() - 15; y += 18) {
-            for (int x = 16; x < bitmap.getWidth() - 16; x += 20) {
+        for (int y = 8; y < bitmap.getHeight() - 8; y += 8) {
+            for (int x = 8; x < bitmap.getWidth() - 8; x += 8) {
                 int pixel = bitmap.getPixel(x, y);
+                if (Color.alpha(pixel) < 200) continue;
                 int r = Color.red(pixel), g = Color.green(pixel), b = Color.blue(pixel);
                 int high = Math.max(r, Math.max(g, b)), low = Math.min(r, Math.min(g, b));
                 int score = high - low;
@@ -97,20 +106,16 @@ final class ArtworkLoader {
     }
 
     private Bitmap render(AppRepository.App app) {
-        // Every pixel is painted opaque; 565 halves the backing memory on small sticks.
-        Bitmap bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.RGB_565);
+        // Small transparent icons, shared by cards and the decorative hero mark.
+        Bitmap bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-        canvas.drawColor(Color.rgb(28, 32, 40));
         Drawable art = null;
-        boolean banner = false;
         try {
-            art = app.info.activityInfo.loadBanner(context.getPackageManager());
-            banner = art != null;
-            if (art == null) art = app.info.loadIcon(context.getPackageManager());
+            art = app.info.loadIcon(context.getPackageManager());
         } catch (RuntimeException ignored) { /* Package may have been removed during this request. */ }
         if (art == null) art = context.getPackageManager().getDefaultActivityIcon();
         int width = Math.max(1, art.getIntrinsicWidth()), height = Math.max(1, art.getIntrinsicHeight());
-        float scale = Math.min((banner ? WIDTH : 100f) / width, (banner ? HEIGHT : 100f) / height);
+        float scale = Math.min((WIDTH - 8f) / width, (HEIGHT - 8f) / height);
         int w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
         Rect old = new Rect(art.getBounds());
         art.setBounds((WIDTH - w) / 2, (HEIGHT - h) / 2, (WIDTH + w) / 2, (HEIGHT + h) / 2);

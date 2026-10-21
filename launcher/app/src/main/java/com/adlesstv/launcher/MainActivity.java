@@ -31,6 +31,7 @@ import android.window.OnBackInvokedDispatcher;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -599,8 +600,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void updateHero() {
         heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
-        ((TextView) findViewById(R.id.hero_mark)).setText(selectedApp == null || selectedApp.label.isEmpty()
-                ? "" : selectedApp.label.substring(0, selectedApp.label.offsetByCodePoints(0, 1)));
+        ((ImageView) findViewById(R.id.hero_mark)).setImageBitmap(
+                selectedApp == null ? null : artwork.icon(selectedApp));
         heroOpen.setEnabled(selectedApp != null);
         heroInfo.setEnabled(selectedApp != null);
         VisualTheme.applyAccent(this, repository.visualTheme(), findViewById(R.id.root),

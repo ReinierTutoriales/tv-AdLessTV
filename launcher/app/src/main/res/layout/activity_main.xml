@@ -31,10 +31,9 @@
     <FrameLayout android:id="@+id/hero" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="16dp"
         android:layout_marginBottom="12dp">
-        <TextView android:id="@+id/hero_mark" android:layout_width="260dp" android:layout_height="match_parent"
-            android:layout_gravity="end" android:gravity="center" android:textSize="190sp"
-            android:textStyle="bold" android:textColor="#FFFFFF" android:alpha="0.045"
-            android:includeFontPadding="false" android:importantForAccessibility="no" />
+        <ImageView android:id="@+id/hero_mark" android:layout_width="260dp" android:layout_height="match_parent"
+            android:layout_gravity="end" android:scaleType="fitCenter" android:alpha="0.10"
+            android:importantForAccessibility="no" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
             android:orientation="vertical" android:gravity="center_vertical">
             <TextView android:id="@+id/hero_kicker" android:layout_width="wrap_content" android:layout_height="wrap_content"

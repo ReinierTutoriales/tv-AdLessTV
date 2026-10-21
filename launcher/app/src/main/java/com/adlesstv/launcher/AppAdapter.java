@@ -8,8 +8,10 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
+import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -154,7 +156,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         AppRepository.App app = entry.app;
         holder.tile.label.setText(app.label);
         holder.tile.setContentDescription(app.label);
-        artwork.bind(holder.tile.icon, app);
+        artwork.bind(holder.tile.icon, app, holder.tile::setAccent);
         holder.tile.setOnClickListener(v -> listener.opened(app));
         holder.tile.setOnLongClickListener(v -> { listener.options(app); return true; });
         holder.tile.animate().cancel();
@@ -197,26 +199,34 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         } else view.animate().scaleX(scale).scaleY(scale).setDuration(120).start();
     }
 
-    /** Artwork ratio follows the measured span width; no minimum width can overflow a column. */
-    static final class Tile extends LinearLayout {
+    /** The app icon and label sit directly on an opaque native gradient. */
+    static final class Tile extends FrameLayout {
         final ImageView icon;
         final TextView label;
+        private final GradientDrawable normal = new GradientDrawable();
+        private final GradientDrawable focused = new GradientDrawable();
+        private int accent = Integer.MIN_VALUE;
         Tile(Context context) {
             super(context);
-            setOrientation(VERTICAL);
-            setGravity(Gravity.CENTER_VERTICAL);
             setFocusable(true);
             setFocusableInTouchMode(true);
             setClickable(true);
-            setBackgroundResource(R.drawable.focus_card);
-            int padding = dp(context, 7);
+            normal.setCornerRadius(dp(context, 16));
+            focused.setCornerRadius(dp(context, 16));
+            normal.setOrientation(GradientDrawable.Orientation.TL_BR);
+            focused.setOrientation(GradientDrawable.Orientation.TL_BR);
+            focused.setStroke(dp(context, 2), Color.WHITE);
+            StateListDrawable states = new StateListDrawable();
+            states.addState(new int[]{android.R.attr.state_focused}, focused);
+            states.addState(new int[0], normal);
+            setBackground(states);
+            setAccent(0);
+            int padding = dp(context, 12);
             setPadding(padding, padding, padding, padding);
             icon = new ImageView(context);
             icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            icon.setBackgroundResource(R.drawable.artwork_surface);
-            icon.setClipToOutline(true);
             icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            addView(icon, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+            addView(icon, new LayoutParams(dp(context, 38), dp(context, 38), Gravity.TOP | Gravity.END));
             label = new TextView(context);
             label.setTextColor(Color.rgb(240, 242, 247));
             label.setTextSize(16);
@@ -224,14 +234,29 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setIncludeFontPadding(false);
-            label.setPadding(0, dp(context, 8), 0, dp(context, 2));
+            label.setTypeface(null, android.graphics.Typeface.BOLD);
             label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            addView(label, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            addView(label, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START));
+        }
+        void setAccent(int color) {
+            if (accent == color) return;
+            accent = color;
+            int hue = color == 0 ? 0xFF586273 : color;
+            int[] colors = {blend(hue, 0xFF252B34, 75), blend(hue, 0xFF10141B, 38)};
+            normal.setColors(colors);
+            focused.setColors(colors);
+        }
+        private static int blend(int color, int base, int percent) {
+            return Color.rgb((Color.red(color) * percent + Color.red(base) * (100 - percent)) / 100,
+                    (Color.green(color) * percent + Color.green(base) * (100 - percent)) / 100,
+                    (Color.blue(color) * percent + Color.blue(base) * (100 - percent)) / 100);
         }
         @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            int width = Math.max(0, MeasureSpec.getSize(widthMeasureSpec) - getPaddingLeft() - getPaddingRight());
-            icon.getLayoutParams().height = Math.max(1, Math.round(width * 9f / 16f));
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            int width = MeasureSpec.getSize(widthMeasureSpec);
+            int content = Math.round(label.getTextSize()) + getPaddingTop() + getPaddingBottom() + dp(getContext(), 44);
+            int height = Math.max(Math.round(width * 0.64f), content);
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
         }
     }
 
