@@ -320,7 +320,16 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         else if (adapter.firstApp() >= 0) selectedApp = adapter.at(adapter.firstApp());
         updateHero();
         empty.setText(R.string.no_apps);
-        empty.setVisibility(adapter.firstApp() < 0 && dockAdapter.firstApp() < 0 ? View.VISIBLE : View.GONE);
+        boolean noApps = adapter.firstApp() < 0 && dockAdapter.firstApp() < 0;
+        empty.setVisibility(noApps ? View.VISIBLE : View.GONE);
+        if (noApps) {
+            catalogContainer.animate().cancel();
+            catalogContainer.setAlpha(1f);
+            idleSpacer.setVisibility(View.GONE);
+            catalogContainer.setVisibility(View.VISIBLE);
+            settings.requestFocus();
+            return;
+        }
         if (inDock >= 0 || (inGrid < 0 && dockAdapter.firstApp() >= 0))
             focusDock(inDock >= 0 ? inDock : dockAdapter.firstApp());
         else focusGrid(inGrid >= 0 ? inGrid : adapter.firstApp());
