@@ -30,7 +30,7 @@ if ($MakeHome -or $PlanOnly) {
     }
     $Python = (Get-Command $Python -ErrorAction Stop).Source
     $tool = (Resolve-Path -LiteralPath $tool).Path
-    & $Python @pythonArguments -c 'import sys; assert sys.version_info >= (3,11), "Se requiere Python 3.11 o posterior"'
+    & $Python @pythonArguments -c 'import sys; sys.exit(sys.version_info < (3,11))'
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo ejecutar Python 3.11 o posterior.' }
     New-Item -ItemType Directory -Force -Path $BackupDirectory | Out-Null
     $BackupDirectory = (Resolve-Path -LiteralPath $BackupDirectory).Path
@@ -44,10 +44,10 @@ if ($LASTEXITCODE -ne 0 -or ($state -join "`n").Trim() -ne 'device') {
     throw 'Acepta la autorización ADB en la TV y vuelve a ejecutar.'
 }
 if (-not $HomeOnly) {
-$result = & $adbCommand -s $serial install -r $Apk
-if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Success\s*$') {
-    throw "No se instaló el APK; HOME sigue intacto. Conserva el error de firma si aparece: $result"
-}
+    $result = & $adbCommand -s $serial install -r $Apk
+    if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Success\s*$') {
+        throw "No se instaló el APK; HOME sigue intacto. Conserva el error de firma si aparece: $result"
+    }
 }
 $result = & $adbCommand -s $serial shell am start -W -n 'com.adlesstv.launcher/.MainActivity'
 if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Status: ok\s*$' -or

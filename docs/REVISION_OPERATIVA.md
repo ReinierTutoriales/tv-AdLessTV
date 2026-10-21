@@ -92,8 +92,10 @@ una desconexión. Un propietario Wi-Fi dependiente o un HOME desconocido bloquea
 el reemplazo antes de modificar la selección.
 
 `launcher/install-apk.ps1` usa el APK ya compilado y Platform-Tools. El paquete CI
-incluye ambos y las herramientas Python sin exigir pip para el transporte ADB
-nativo. `-MakeHome` realiza la configuración completa; `-PlanOnly` muestra el plan.
+incluye el APK, el instalador y las herramientas Python; Platform-Tools se aporta
+por separado. El transporte ADB nativo no exige pip. `-MakeHome` realiza la
+configuración completa; `-HomeOnly` configura una app ya instalada y `-PlanOnly`
+muestra el plan.
 El respaldo y los scripts ejecutables de verificar/restaurar se preparan antes de
 cambiar HOME. Véase [INSTALAR_APK.md](INSTALAR_APK.md).
 
