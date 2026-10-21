@@ -33,12 +33,12 @@ if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Status: ok\s*$'
 if ($HomeSnapshot) {
     $parent = Split-Path -Parent $HomeSnapshot
     if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-    $homeTool = Join-Path $root '..\tools\home.py'
+    $homeTool = Join-Path $root '..\tools\setup.py'
     $homeArgs = @('--host', $TvHost, '--activate', $HomeSnapshot)
     if ($ReplaceStock) { $homeArgs += @('--stock-package', $ReplaceStock) }
     & $Python $homeTool @homeArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Output "Reinicia la TV y verifica con: tools/home.py --verify-reboot $HomeSnapshot"
+    Write-Output "Reinicia la TV y verifica con: python tools/setup.py --host $TvHost --verify-reboot $HomeSnapshot"
 } else {
     Write-Output 'Vista previa instalada. Para elegir HOME usa -HomeSnapshot <respaldo-nuevo.json>.'
 }
