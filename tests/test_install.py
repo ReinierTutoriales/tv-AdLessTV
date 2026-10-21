@@ -32,9 +32,10 @@ elif 'pm list features' in sys.argv:
  print('feature:android.software.leanback')
 elif 'pm install -r /data/local/tmp/adlesstv-preview.apk' in sys.argv:
  print('Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]' if os.environ.get('FAIL_INSTALL') else 'Success')
+ if os.environ.get('MIXED_RESULT'): print('Failure [INSTALL_FAILED_ABORTED]')
 elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
- print('Status: ok')
- if os.environ.get('FAIL_START'): print('Error: Activity not started')
+ print('Status: ok\\r' if os.environ.get('CRLF') else 'Status: ok')
+ if os.environ.get('FAIL_START'): print('  eRRoR: Activity not started')
 ''')
             client.chmod(0o700)
             capture = root / 'calls.jsonl'
@@ -46,6 +47,15 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
             calls = [json.loads(line) for line in capture.read_text().splitlines()]
             self.assertIn('rm -f /data/local/tmp/adlesstv-preview.apk', [arg for call in calls for arg in call])
             self.assertEqual(calls[-1][1:], ['--activate', 'backups/home.json', '--stock-package', 'com.factory.home'])
+            capture.unlink()
+            crlf = subprocess.run(command, cwd=root, env={**environment, 'CRLF': '1'},
+                                  capture_output=True, text=True)
+            self.assertEqual(crlf.returncode, 0, crlf.stderr)
+            capture.unlink()
+            mixed = subprocess.run(command, cwd=root, env={**environment, 'MIXED_RESULT': '1'},
+                                   capture_output=True, text=True)
+            self.assertNotEqual(mixed.returncode, 0)
+            self.assertNotIn('--activate', capture.read_text())
             capture.unlink()
             failure = subprocess.run(command, cwd=root, env={**environment, 'FAIL_INSTALL': '1'}, capture_output=True)
             self.assertNotEqual(failure.returncode, 0)

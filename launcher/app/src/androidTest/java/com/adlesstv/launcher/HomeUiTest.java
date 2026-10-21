@@ -34,6 +34,31 @@ import static org.junit.Assert.*;
 public class HomeUiTest {
     private final android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
 
+    @Test public void packageRefreshKeepsToolbarFocus() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        java.lang.reflect.Field changes = MainActivity.class.getDeclaredField("packageChanges");
+        java.lang.reflect.Field scanning = MainActivity.class.getDeclaredField("scanning");
+        changes.setAccessible(true);
+        scanning.setAccessible(true);
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            scenario.onActivity(activity -> {
+                assertTrue(activity.findViewById(R.id.action_settings).requestFocus());
+                try {
+                    ((android.content.BroadcastReceiver) changes.get(activity)).onReceive(activity,
+                            new Intent(Intent.ACTION_PACKAGE_CHANGED,
+                                    android.net.Uri.parse("package:" + context.getPackageName())));
+                } catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            waitUntil(scenario, activity -> {
+                try { return !scanning.getBoolean(activity); }
+                catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            scenario.onActivity(activity -> assertEquals(activity.findViewById(R.id.action_settings),
+                    activity.getCurrentFocus()));
+        }
+    }
+
     @Test public void visualThemeIsLocalAndSurvivesActivityRecreation() {
         Context context = instrumentation.getTargetContext();
         AppRepository preferences = new AppRepository(context);

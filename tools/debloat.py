@@ -275,6 +275,7 @@ def restore(dev, data, path):
 def verify(dev, data):
     """Check package state without changing the TV, including after a reboot."""
     validate_snapshot(data)
+    require_user_zero(dev)
     if identity(dev) != data["device"]:
         raise ValueError("El respaldo pertenece a otra TV o a otro perfil.")
     if data.get("firmware") and shell(dev, "getprop ro.build.fingerprint").strip() != data["firmware"]:
@@ -305,6 +306,8 @@ def fix(dev, data, path):
     if identity(dev) != data["device"]:
         raise ValueError("El respaldo pertenece a otra TV o a otro perfil.")
     firmware = shell(dev, "getprop ro.build.fingerprint").strip()
+    if not firmware:
+        raise ValueError("No se pudo identificar el firmware; no se reaplicará el debloat.")
     if data.get("firmware") and firmware != data["firmware"]:
         print(f"Aviso: firmware actualizado ({data['firmware']} → {firmware}); se revisan los mismos paquetes.")
     drifted, skipped = [], []
@@ -327,17 +330,29 @@ def fix(dev, data, path):
         drifted.append(entry["package"])
     if drifted:
         check_wifi_provisioning(dev, drifted)
+    changed = []
     for package in drifted:
+        # A user/session, input, VPN or Wi-Fi owner can change after the initial scan.
+        require_user_zero(dev)
+        if shell(dev, "getprop ro.build.fingerprint").strip() != firmware:
+            raise ValueError("Cambió el firmware durante la reparación; conserva el respaldo.")
+        if package in protected_packages(dev):
+            skipped.append(f"{package}: pasó a cumplir una función protegida; se deja activo")
+            continue
+        check_wifi_provisioning(dev, [package])
+        if package_state(dev, package) in (2, 3, 4):
+            continue
         shell(dev, f"pm disable-user --user 0 {package}")
         if package_state(dev, package) != 3:
             raise RuntimeError(f"No se confirmó la desactivación de {package}")
+        changed.append(package)
         print(f"Desactivado de nuevo: {package}")
     data.setdefault("fixed", []).append({"at": datetime.now(timezone.utc).isoformat(),
-                                         "firmware": firmware, "packages": drifted})
+                                         "firmware": firmware, "packages": changed})
     write_snapshot(path, data)
     for message in skipped:
         print("Revisar a mano: " + message)
-    if not drifted and not skipped:
+    if not changed and not skipped:
         print("Sin cambios: la TV conserva el estado del respaldo.")
     return 1 if skipped else 0
 

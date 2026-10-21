@@ -20,6 +20,7 @@ import android.widget.ImageView;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,7 @@ final class ArtworkLoader {
     private final ThreadPoolExecutor workers;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<ImageView, Future<?>> requests = new IdentityHashMap<>();
+    private final Map<ImageView, Boolean> bindings = new WeakHashMap<>();
     private final LruCache<String, Artwork> cache;
     private volatile boolean closed;
     private volatile int revision;
@@ -54,7 +56,8 @@ final class ArtworkLoader {
         int bytes = lowRam ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
         // One decoder on low-RAM sticks keeps peak heap flat; two hide latency elsewhere.
         int threads = lowRam || Runtime.getRuntime().availableProcessors() <= 2 ? 1 : 2;
-        workers = new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+        workers = new ThreadPoolExecutor(threads, threads, 15L, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+        workers.allowCoreThreadTimeOut(true);
         cache = new LruCache<String, Artwork>(bytes) {
             @Override protected int sizeOf(String key, Artwork value) { return value.bitmap.getAllocationByteCount(); }
         };
@@ -62,6 +65,7 @@ final class ArtworkLoader {
 
     void bind(ImageView view, AppRepository.App app) {
         cancel(view);
+        bindings.put(view, Boolean.TRUE);
         final int generation = revision;
         final String key = app.key() + ":" + generation;
         view.setTag(key);
@@ -70,7 +74,15 @@ final class ArtworkLoader {
         if (ready != null || closed) return;
         Future<?> request = workers.submit(() -> {
             if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
-            Artwork result = new Artwork(render(app));
+            Artwork result;
+            try {
+                result = new Artwork(render(app));
+            } catch (RuntimeException invalidArtwork) {
+                main.post(() -> {
+                    if (!closed && revision == generation && key.equals(view.getTag())) requests.remove(view);
+                });
+                return;
+            }
             if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
             main.post(() -> {
                 if (!closed && revision == generation && key.equals(view.getTag())) {
@@ -127,6 +139,8 @@ final class ArtworkLoader {
             }
         } catch (RuntimeException ignored) { /* Package may have been removed during this request. */ }
         if (art == null) art = pm.getDefaultActivityIcon();
+        Drawable.ConstantState constant = art.getConstantState();
+        if (constant != null) art = constant.newDrawable(context.getResources()).mutate();
         int width = Math.max(1, art.getIntrinsicWidth()), height = Math.max(1, art.getIntrinsicHeight());
         float box = app.isInput() ? 72f : 100f;
         float scale = Math.min((banner ? WIDTH : box) / width, (banner ? HEIGHT : box) / height);
@@ -155,6 +169,7 @@ final class ArtworkLoader {
     }
 
     void cancel(ImageView view) {
+        bindings.remove(view);
         Future<?> previous = requests.remove(view);
         if (previous != null) {
             previous.cancel(true);
@@ -167,6 +182,7 @@ final class ArtworkLoader {
     void invalidate() {
         revision++;
         for (ImageView view : new java.util.ArrayList<>(requests.keySet())) cancel(view);
+        main.removeCallbacksAndMessages(null);
         cache.evictAll();
     }
     /** Keep half the tiles when Home is merely hidden; drop everything when the system is short. */
@@ -175,8 +191,19 @@ final class ArtworkLoader {
         else cache.trimToSize(cache.maxSize() / 2);
     }
 
+    void release() {
+        // Cached and completed bitmaps can still be held by RecyclerView tiles.
+        for (ImageView view : new java.util.ArrayList<>(bindings.keySet())) {
+            view.setImageDrawable(null);
+            view.setTag(null);
+        }
+        bindings.clear();
+        invalidate();
+    }
+
     void close() {
         closed = true;
+        release();
         for (Future<?> request : requests.values()) request.cancel(true);
         requests.clear();
         workers.shutdownNow();

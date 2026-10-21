@@ -7,7 +7,6 @@ description: "Use when working on AdLessTV: debloating Android TV/Google TV via 
 
 Usa este skill cuando el usuario trabaje en el repositorio AdLessTV, quiera limpiar una Android TV / Google TV de anuncios y telemetría, o necesite construir/configurar el lanzador ligero.
 
-Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes del estándar Agent Skills.
 
 ## Principios inmutables
 

@@ -88,6 +88,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private final Runnable showIdleClock = this::showIdleClock;
     private final BroadcastReceiver packageChanges = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_PACKAGE_REMOVED.equals(intent.getAction())
+                    && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return;
             dirty = true;
             artwork.invalidate();
             if (resumed) refresh();
@@ -123,6 +125,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private AppRepository.App selectedApp;
     private String lastFocused;
     private boolean resumed;
+    private boolean started;
+    private boolean catalogReady;
+    private boolean artworkReleased;
     private boolean dirty = true;
     private boolean scanning;
     private boolean destroyed;
@@ -294,9 +299,24 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        started = true;
+    }
+
+    @Override protected void onStop() {
+        started = false;
+        super.onStop();
+    }
+
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
+        if (artworkReleased) {
+            artworkReleased = false;
+            adapter.notifyDataSetChanged();
+            dockAdapter.notifyDataSetChanged();
+        }
         updateMemory();
         if (config.showNetworkPill) networkStatus.start();
         scheduleIdleClock();
@@ -314,6 +334,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             return;
         }
         if (RemoteKeyService.ACTION_INPUTS.equals(intent.getAction())) main.post(this::showInputs);
+        else if (Intent.ACTION_MAIN.equals(intent.getAction()) && intent.hasCategory(Intent.CATEGORY_HOME))
+            returnToDock();
     }
 
     @Override public void onUserInteraction() {
@@ -354,6 +376,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL;
         // Opening an app hides Home: keep half the artwork so returning does not redraw every tile.
         if (critical || level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) artwork.trim(critical);
+        if (critical && !started) {
+            artwork.release();
+            artworkReleased = true;
+        }
     }
 
     @Override protected void onDestroy() {
@@ -408,6 +434,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void render() {
+        String returnKey = lastFocused;
+        boolean restoreFocus = !catalogReady || grid.hasFocus() || dock.hasFocus()
+                || pendingGridPosition >= 0 || pendingDockPosition >= 0;
+        catalogReady = true;
         pendingGridPosition = RecyclerView.NO_POSITION;
         pendingDockPosition = RecyclerView.NO_POSITION;
         Map<String, AppRepository.App> byKey = new HashMap<>();
@@ -430,8 +460,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         adapter.replace(Collections.emptyList(), rest, tvInputs, allowedCards);
         main.post(this::askPendingCard);
         selectedApp = null;
-        int inDock = dockAdapter.indexOf(lastFocused);
-        int inGrid = adapter.indexOf(lastFocused);
+        int inDock = dockAdapter.indexOf(returnKey);
+        int inGrid = adapter.indexOf(returnKey);
         if (inDock >= 0) selectedApp = dockAdapter.at(inDock);
         else if (inGrid >= 0) selectedApp = adapter.at(inGrid);
         else if (dockAdapter.firstApp() >= 0) selectedApp = dockAdapter.at(dockAdapter.firstApp());
@@ -450,6 +480,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             settings.requestFocus();
             return;
         }
+        // A background package/input change must not take focus away from the toolbar.
+        if (!restoreFocus) return;
         // Preserve the catalog state when the package list refreshes.
         if (catalogContainer.getVisibility() == View.VISIBLE && inGrid >= 0) {
             focusGrid(inGrid);
@@ -1138,6 +1170,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             focusDock(previous >= 0 ? previous : dockAdapter.firstApp());
         } else if (dockAdapter.firstApp() >= 0) {
             focusDock(dockAdapter.firstApp());
+        } else if (adapter.firstApp() >= 0) {
+            // A user can remove every favorite. Back/Home must keep the remaining apps reachable.
+            focusGrid(adapter.firstApp());
         } else {
             setCatalogMode(false);
             catalogContainer.setVisibility(View.GONE);

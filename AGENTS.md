@@ -2,7 +2,6 @@
 
 Proyecto con lanzador ligero Android TV y herramientas reversibles de ADB y debloat.
 
-Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes que lean el estándar Agent Skills.
 
 ## Reglas críticas
 
@@ -22,8 +21,7 @@ Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes que lean el est
 - `examples/` — listas de debloat por modelo.
 - `launcher/` — proyecto Android Java con scripts de compilación e instalación.
 - `PROMPT.md` — prompt listo para agentes.
-- `.agents/skills/adlesstv/` — skill canónico (Codex, Cursor, OpenCode, etc.).
-- `.claude/skills/adlesstv/` — skill para Claude Code.
+- `.agents/skills/adlesstv/` — instrucciones del proyecto.
 
 ## Flujo recomendado
 

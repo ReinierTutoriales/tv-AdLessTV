@@ -21,6 +21,9 @@ fi
 if [[ "$BUILD_ONLY" == 1 && ( -n "$HOME_SNAPSHOT" || -n "$STOCK_PACKAGE" ) ]]; then
   echo '--build-only no se combina con --make-home.' >&2; exit 2
 fi
+if [[ -n "$HOME_SNAPSHOT" && -e "$HOME_SNAPSHOT" ]]; then
+  echo 'El respaldo HOME ya existe; elige una ruta nueva antes de instalar.' >&2; exit 2
+fi
 "$ROOT/gradlew" -p "$ROOT" :app:assembleDebug
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
 [[ -s "$APK" ]] || { echo "El APK compilado no existe o está vacío: $APK" >&2; exit 1; }
@@ -60,7 +63,8 @@ fi
 # The APK is staged in /data/local/tmp; keep no extra copy on an 8 GB stick.
 cleanup_staged_apk
 trap - EXIT
-if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
+result="${result//$'\r'/}"
+if [[ "$install_status" != 0 || ! "$result" =~ ^[[:space:]]*Success[[:space:]]*$ ]]; then
   printf 'Instalación fallida: %s\n' "$result" >&2
   if [[ "$result" == *INSTALL_FAILED_UPDATE_INCOMPATIBLE* || "$result" == *signatures* ]]; then
     echo 'La versión instalada está firmada con otra clave. No se desinstala automáticamente:' >&2
@@ -69,7 +73,8 @@ if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
   exit 1
 fi
 result="$("$PY" "$ROOT/../tools/tv.py" 'am start -W -n com.adlesstv.launcher/.MainActivity')"
-if [[ ! "$result" =~ (^|$'\n')Status:\ ok($|$'\n') || "$result" =~ (^|$'\n')Error: ]]; then
+result="${result//$'\r'/}"
+if [[ ! "$result" =~ (^|$'\n')[[:blank:]]*Status:\ ok[[:blank:]]*($|$'\n') || "$result" =~ (^|$'\n')[[:blank:]]*[Ee][Rr][Rr][Oo][Rr]: ]]; then
   printf 'El lanzador no inició: %s\n' "$result" >&2; exit 1
 fi
 if [[ -n "$HOME_SNAPSHOT" ]]; then

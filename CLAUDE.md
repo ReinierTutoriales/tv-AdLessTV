@@ -20,7 +20,7 @@ Proyecto con lanzador ligero Android TV y herramientas reversibles de ADB y debl
 - `examples/` — listas de debloat por modelo.
 - `launcher/` — proyecto Android Java con scripts de compilación e instalación.
 - `PROMPT.md` — prompt listo para agentes.
-- `.claude/skills/adlesstv/` — skill específico del proyecto.
+- `.agents/skills/adlesstv/` — instrucciones del proyecto.
 
 ## Flujo recomendado
 

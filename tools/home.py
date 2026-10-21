@@ -52,7 +52,7 @@ def read_snapshot(path, device):
     if (not isinstance(data, dict) or data.get("version") not in (1, 2)
             or data.get("new") != NEW_HOME
             or data.get("status") not in ("pending", "active", "reboot_verified",
-                                          "stock_pending", "stock_disabled", "stock_verified", "restored")
+                                          "stock_pending", "stock_disabled", "stock_verified", "restoring", "restored")
             or not isinstance(data.get("previous"), str)
             or not COMPONENT.fullmatch(data["previous"])
             or canonical(data["previous"]) == NEW_HOME):
@@ -67,6 +67,9 @@ def read_snapshot(path, device):
         raise ValueError("Este respaldo HOME pertenece a otra TV.")
     if data.get("stock_package") not in (None, data["previous"].split("/", 1)[0]):
         raise ValueError("Paquete HOME inválido en el respaldo.")
+    if (data["status"] in ("stock_pending", "stock_disabled", "stock_verified", "restoring")
+            and not data.get("stock_package")):
+        raise ValueError("Falta el paquete HOME que debe recuperarse.")
     data["previous"] = canonical(data["previous"])
     return data
 
@@ -233,29 +236,32 @@ def disable_stock(device, snapshot_path, expected_package):
 def restore(device, snapshot_path):
     path = Path(snapshot_path)
     data = read_snapshot(path, device)
+    require_user_zero(device)
     if data["status"] == "restored":
         if current_home(device) == data["previous"]:
             print("HOME original ya restaurado.")
             return
         raise ValueError("HOME cambió después de la restauración; no se alterará.")
     # Recover the stock package first: a failed HOME resolution must not prevent recovery.
-    if data["status"] in ("stock_pending", "stock_disabled", "stock_verified"):
+    if data["status"] in ("stock_pending", "stock_disabled", "stock_verified", "restoring") and data.get("stock_package"):
+        # Keep the recovery intent until both package and HOME role are restored.
+        data["status"] = "restoring"
+        write_snapshot(path, data)
         stock = data["stock_package"]
         if package_state(device, stock) != data["previous_state"]:
             action = "default-state" if data["previous_state"] == 0 else "enable"
             shell(device, f"pm {action} --user 0 {stock}")
             if package_state(device, stock) != data["previous_state"]:
                 raise RuntimeError("No se confirmó la restauración del HOME anterior.")
-        data["status"] = "active"
-        write_snapshot(path, data)
     # If a user selected a different HOME meanwhile, respect that choice.
     try:
         current = current_home(device)
     except ValueError:
         current = None  # Resolver/no preferred HOME after a failed replacement: recover the saved HOME.
-    if current is not None and current not in (NEW_HOME, data["previous"]):
+    if current is not None and current not in ({NEW_HOME, data["previous"]} | SYSTEM_FALLBACK_HOMES):
         raise ValueError("HOME fue cambiado manualmente; el paquete anterior está restaurado.")
     # Restore the role as well: stock priority can hide a still-assigned replacement role.
+    require_user_zero(device)
     shell(device, "cmd package set-home-activity --user 0 " + data["previous"])
     if current_home(device) != data["previous"]:
         raise RuntimeError("No se confirmó HOME anterior. Conserva el respaldo.")

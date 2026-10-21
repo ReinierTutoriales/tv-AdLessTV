@@ -13,6 +13,7 @@ final class Wallpaper {
     private Wallpaper() { }
 
     static Bitmap decode(File file, int screenWidth, int screenHeight, boolean trueColor) {
+        if (screenWidth <= 0 || screenHeight <= 0) return null;
         if (file == null || !file.isFile() || file.length() == 0 || file.length() > MAX_FILE) return null;
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;

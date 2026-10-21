@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($ReplaceStock -and -not $HomeSnapshot) { throw '-ReplaceStock requiere -HomeSnapshot.' }
 if ($BuildOnly -and ($HomeSnapshot -or $ReplaceStock)) { throw '-BuildOnly no se combina con -HomeSnapshot.' }
+if ($HomeSnapshot -and (Test-Path -LiteralPath $HomeSnapshot)) { throw 'El respaldo HOME ya existe; elige una ruta nueva antes de instalar.' }
 $root = $PSScriptRoot
 & (Join-Path $root 'gradlew.bat') '-p' $root ':app:assembleDebug'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -38,7 +39,7 @@ try {
     try { & $Python $client '--host' $TvHost 'rm -f /data/local/tmp/adlesstv-preview.apk' | Out-Null }
     catch { Write-Warning 'No se pudo borrar el APK temporal de la TV; revisa /data/local/tmp cuando vuelva ADB.' }
 }
-if ($installCode -ne 0 -or $result -notmatch 'Success') {
+if ($installCode -ne 0 -or ($result -join "`n").Trim() -cnotmatch '\ASuccess\z') {
     if ($result -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE|signatures') {
         throw "Instalación fallida: $result`nLa versión instalada está firmada con otra clave. No se desinstala automáticamente: si AdLessTV es HOME, restaura primero el HOME anterior con tools/home.py --restore <respaldo>."
     }
@@ -46,7 +47,7 @@ if ($installCode -ne 0 -or $result -notmatch 'Success') {
 }
 $result = & $Python $client '--host' $TvHost 'am start -W -n com.adlesstv.launcher/.MainActivity'
 if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Status: ok\s*$' -or
-    ($result -join "`n") -match '(?im)^Error:') { throw "El lanzador no inició: $result" }
+    ($result -join "`n") -match '(?im)^\s*Error:') { throw "El lanzador no inició: $result" }
 if ($HomeSnapshot) {
     $parent = Split-Path -Parent $HomeSnapshot
     if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }

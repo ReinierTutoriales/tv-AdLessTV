@@ -151,8 +151,10 @@ final class HomeConfig {
         List<String> out = new ArrayList<>();
         for (int i = 0; i < array.length(); i++) {
             Object value = array.opt(i);
-            if (value instanceof String && !((String) value).trim().isEmpty() && !out.contains(value))
-                out.add(((String) value).trim());
+            if (value instanceof String) {
+                String text = ((String) value).trim();
+                if (!text.isEmpty() && !out.contains(text)) out.add(text);
+            }
         }
         return out;
     }

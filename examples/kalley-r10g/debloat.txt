@@ -16,10 +16,6 @@
 # With the stock launcher gone nothing handles it, so enable the launcher's InputKeyService
 # (INPUT_KEY_SERVICE=1). com.android.tv.action.VIEW_INPUTS resolves to com.realtek.tv/.SelectInputActivity.
 #
-# Tested on one set on 2026-10-19/20 with the reference launcher: the apps kept (Netflix, Disney+,
-# Max, Spotify, YouTube, Twitch, GeForce NOW, Stremio) still launch, and HDMI input, Home and the
-# Input button work. This list is fresh, not yet lived with for days; update it if something breaks.
-
 # Google partner setup and store plumbing
 com.google.android.partnersetup
 com.google.android.videos                   # Play Movies & TV

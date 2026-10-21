@@ -7,10 +7,6 @@
 # Deshacer: python tools/debloat.py restore backups/wanbo-x5-pro.json
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
 #
-# Applied on 2026-10-19, then the reference launcher (v2.3) installed and Home, D-pad navigation and
-# launching Netflix and YouTube from the dock checked with screenshots. Not yet lived with for days;
-# if something breaks, re-enable it with `pm enable <package>` and please report it.
-#
 # Stock launcher: com.google.android.apps.tv.launcherx. setupwraith .RecoveryActivity also claims HOME
 # (priority 1): with only launcherx disabled, Home went to it and it restarted itself every ~60 ms.
 # Disabling just that component is refused (SecurityException), so the whole package is in this list.

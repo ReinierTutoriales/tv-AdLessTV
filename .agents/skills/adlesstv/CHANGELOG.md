@@ -9,5 +9,4 @@
 - compileSdk 37 (targetSdk 36), Gradle 9.8.2, acciones de CI fijadas por SHA, emulador TV con 2 GB de RAM
 ## 2026-10-18
 - Initial skill creation for AdLessTV project
-- Added multi-agent support (Claude Code + Codex/OpenAI + others)
 - Covers debloat, launcher config, ADB tools and safety rules

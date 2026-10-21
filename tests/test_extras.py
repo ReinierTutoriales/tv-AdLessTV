@@ -179,6 +179,51 @@ class KeysTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'otra TV'):
             keys.restore(other, self.path)
 
+    def test_tampered_backup_cannot_execute_shell_text(self):
+        dev = KeysDevice()
+        keys.enable(dev, self.path)
+        original = json.loads(self.path.read_text())
+        for field, value in (('services', "com.vendor/.Talk'; reboot; '"),
+                             ('services', 'com.vendor/.Talk::com.other/.Reader'),
+                             ('accessibility_enabled', "1'; reboot; '"),
+                             ('status', 'unknown')):
+            with self.subTest(field=field, value=value):
+                self.path.write_text(json.dumps({**original, field: value}))
+                before = dict(dev.secure)
+                with self.assertRaises(ValueError): keys.restore(dev, self.path)
+                self.assertEqual(dev.secure, before)
+
+    def test_partial_enable_rolls_back_and_restore_is_idempotent(self):
+        dev = KeysDevice('com.vendor/.Talk', '0')
+        original = dev.shell
+        failed = False
+        def response(command):
+            nonlocal failed
+            if command == 'settings --user 0 put secure accessibility_enabled 1' and not failed:
+                failed = True
+                raise tv.RemoteError('connection lost')
+            return original(command)
+        with patch.object(dev, 'shell', side_effect=response):
+            with self.assertRaises(tv.RemoteError): keys.enable(dev, self.path)
+        self.assertEqual(dev.secure, {'enabled_accessibility_services': 'com.vendor/.Talk',
+                                      'accessibility_enabled': '0'})
+        self.assertEqual(json.loads(self.path.read_text())['status'], 'restored')
+        dev.secure['enabled_accessibility_services'] = 'com.later/.Reader'
+        dev.secure['accessibility_enabled'] = '1'
+        keys.restore(dev, self.path)
+        self.assertEqual(dev.secure['enabled_accessibility_services'], 'com.later/.Reader')
+
+    def test_enable_requires_both_service_and_enabled_flag(self):
+        dev = KeysDevice()
+        original = dev.shell
+        def response(command):
+            if command == 'settings --user 0 put secure accessibility_enabled 1': return ''
+            return original(command)
+        with patch.object(dev, 'shell', side_effect=response):
+            with self.assertRaisesRegex(RuntimeError, 'todos los ajustes'): keys.enable(dev, self.path)
+        self.assertEqual(dev.secure['enabled_accessibility_services'], 'null')
+        self.assertEqual(dev.secure['accessibility_enabled'], '0')
+
 
 class FixTests(unittest.TestCase):
     def setUp(self):
@@ -220,6 +265,35 @@ class FixTests(unittest.TestCase):
         data['packages'][0]['status'] = 'pending'
         with self.assertRaisesRegex(ValueError, 'interrumpido'):
             debloat.fix(self.dev, data, self.path)
+
+    def prepare_drift(self):
+        snapshot = debloat.plan(self.dev, ['com.test.first', 'com.test.second'])
+        debloat.apply(self.dev, snapshot, self.path)
+        self.dev.states['com.test.first'] = 0
+        self.dev.states['com.test.second'] = 1
+        self.dev.writes.clear()
+        return json.loads(self.path.read_text())
+
+    def test_fix_rechecks_user_between_package_changes(self):
+        data = self.prepare_drift()
+        self.dev.on_write = lambda: setattr(self.dev, 'current_user', '10')
+        with self.assertRaisesRegex(ValueError, 'usuario visible'):
+            debloat.fix(self.dev, data, self.path)
+        self.assertEqual(len(self.dev.writes), 1)
+        self.assertEqual(self.dev.states['com.test.second'], 1)
+
+    def test_fix_rechecks_newly_protected_package(self):
+        data = self.prepare_drift()
+        self.dev.on_write = lambda: setattr(self.dev, 'vpn', 'com.test.second')
+        self.assertEqual(debloat.fix(self.dev, data, self.path), 1)
+        self.assertEqual(len(self.dev.writes), 1)
+        self.assertEqual(self.dev.states['com.test.second'], 1)
+
+    def test_fix_refuses_missing_firmware(self):
+        data = self.prepare_drift()
+        self.dev.firmware = ''
+        with self.assertRaisesRegex(ValueError, 'firmware'): debloat.fix(self.dev, data, self.path)
+        self.assertEqual(self.dev.writes, [])
 
 
 

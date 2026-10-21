@@ -3,10 +3,12 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
+import shlex
 
-from debloat import identity, require_user_zero, write_snapshot
+from debloat import COMPONENT, identity, require_user_zero, write_snapshot
 from tv import connect, shell
 
 SERVICE = "com.adlesstv.launcher/com.adlesstv.launcher.RemoteKeyService"
@@ -16,7 +18,17 @@ SHORT = "com.adlesstv.launcher/.RemoteKeyService"
 def read_state(dev):
     services = shell(dev, "settings --user 0 get secure enabled_accessibility_services").strip()
     enabled = shell(dev, "settings --user 0 get secure accessibility_enabled").strip()
-    return ("" if services.lower() == "null" else services), ("" if enabled.lower() == "null" else enabled)
+    services = "" if services.lower() == "null" else services
+    enabled = "" if enabled.lower() == "null" else enabled
+    validate_state(services, enabled)
+    return services, enabled
+
+
+def validate_state(services, enabled):
+    if (not isinstance(services, str) or not isinstance(enabled, str)
+            or enabled not in ("", "0", "1")
+            or (services and any(not COMPONENT.fullmatch(item) for item in services.split(":")))):
+        raise ValueError("Estado de accesibilidad inválido; no se modificarán los ajustes.")
 
 
 def listed(services):
@@ -31,7 +43,7 @@ def put(dev, key, value):
     if value == "":
         shell(dev, f"settings --user 0 delete secure {key}")
     else:
-        shell(dev, f"settings --user 0 put secure {key} '{value}'")
+        shell(dev, f"settings --user 0 put secure {key} {shlex.quote(value)}")
 
 
 def enable(dev, path):
@@ -49,12 +61,22 @@ def enable(dev, path):
             "status": "pending"}
     with path.open("x", encoding="utf-8") as stream:
         json.dump(data, stream, ensure_ascii=False, indent=2)
-    put(dev, "enabled_accessibility_services", ":".join(listed(services) + [SERVICE]))
-    put(dev, "accessibility_enabled", "1")
-    after, _ = read_state(dev)
-    if not any(ours(item) for item in listed(after)):
-        restore(dev, path)
-        raise RuntimeError("El sistema no aceptó el servicio; se restauraron los ajustes anteriores.")
+        stream.flush()
+        os.fsync(stream.fileno())
+    expected = ":".join(listed(services) + [SERVICE])
+    try:
+        put(dev, "enabled_accessibility_services", expected)
+        require_user_zero(dev)
+        put(dev, "accessibility_enabled", "1")
+        after, flag = read_state(dev)
+        if after != expected or flag != "1":
+            raise RuntimeError("El sistema no aceptó todos los ajustes del servicio.")
+    except Exception:
+        try:
+            restore(dev, path)
+        except Exception:
+            print(f"Recuperación pendiente: usa --restore {path} cuando vuelva ADB.", file=sys.stderr)
+        raise
     data["status"] = "enabled"
     write_snapshot(path, data)
     print("Servicio de botones activado. Restaura con --restore y el mismo respaldo.")
@@ -65,18 +87,28 @@ def restore(dev, path):
     path = Path(path)
     data = json.loads(path.read_text(encoding="utf-8"))
     if (not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("services"), str)
-            or not isinstance(data.get("accessibility_enabled"), str)):
+            or not isinstance(data.get("accessibility_enabled"), str)
+            or data.get("status") not in ("pending", "enabled", "restored")):
         raise ValueError("Respaldo de botones inválido.")
+    validate_state(data["services"], data["accessibility_enabled"])
+    if any(ours(item) for item in listed(data["services"])):
+        raise ValueError("El respaldo no corresponde al estado anterior a la activación.")
     if identity(dev) != data.get("device"):
         raise ValueError("Este respaldo pertenece a otra TV.")
+    if data["status"] == "restored":
+        print("El respaldo de botones ya se restauró; se conservan las decisiones posteriores.")
+        return
     current, _ = read_state(dev)
     # Keep services the user enabled afterwards; remove only ours and restore the saved flag.
     previous = listed(data["services"])
     kept = [item for item in listed(current) if not ours(item) and item not in previous]
-    put(dev, "enabled_accessibility_services", ":".join(previous + kept))
-    put(dev, "accessibility_enabled", data["accessibility_enabled"] if not kept else "1")
-    after, _ = read_state(dev)
-    if any(ours(item) for item in listed(after)):
+    expected = ":".join(previous + kept)
+    flag = data["accessibility_enabled"] if not kept else "1"
+    put(dev, "enabled_accessibility_services", expected)
+    require_user_zero(dev)
+    put(dev, "accessibility_enabled", flag)
+    after, enabled = read_state(dev)
+    if after != expected or enabled != flag:
         raise RuntimeError("No se confirmó la retirada del servicio. Conserva el respaldo.")
     data["status"] = "restored"
     write_snapshot(path, data)

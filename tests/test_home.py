@@ -120,6 +120,42 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(self.dev.current, 'com.factory.home/.Home')
         self.assertEqual(json.loads(self.path.read_text())['status'], 'restored')
 
+    def test_restore_requires_visible_user_zero(self):
+        with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path)
+        self.dev.current_user = '10'
+        before = len(self.dev.commands)
+        with self.assertRaisesRegex(ValueError, 'usuario visible'): home.restore(self.dev, self.path)
+        self.assertFalse(any(c.startswith('cmd package set-home') or c.startswith('pm ')
+                             for c in self.dev.commands[before:]))
+
+    def test_stock_restore_resumes_after_package_recovery_and_fallback_home(self):
+        with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path, 'com.factory.home')
+        original = self.dev.shell
+        interrupted = False
+        def response(command):
+            nonlocal interrupted
+            value = original(command)
+            if command == 'pm default-state --user 0 com.factory.home' and not interrupted:
+                interrupted = True
+                self.dev.current = 'com.android.settings/.FallbackHome'
+                raise RuntimeError('connection lost')
+            return value
+        with patch.object(self.dev, 'shell', side_effect=response):
+            with self.assertRaisesRegex(RuntimeError, 'connection lost'): home.restore(self.dev, self.path)
+        self.assertEqual(json.loads(self.path.read_text())['status'], 'restoring')
+        with contextlib.redirect_stdout(io.StringIO()): home.restore(self.dev, self.path)
+        self.assertEqual(self.dev.stock_state, 0)
+        self.assertEqual(self.dev.current, 'com.factory.home/.Home')
+        self.assertEqual(json.loads(self.path.read_text())['status'], 'restored')
+
+    def test_missing_stock_package_in_journal_is_rejected(self):
+        with contextlib.redirect_stdout(io.StringIO()): home.activate(self.dev, self.path, 'com.factory.home')
+        data = json.loads(self.path.read_text())
+        del data['stock_package']
+        self.path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, 'Falta el paquete'): home.restore(self.dev, self.path)
+        self.assertEqual(self.dev.stock_state, 3)
+
     def test_disconnect_after_home_change_is_recoverable(self):
         self.dev.disconnect = True
         with self.assertRaisesRegex(RuntimeError, 'lost connection'):
