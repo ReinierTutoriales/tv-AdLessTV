@@ -199,7 +199,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                     focusVisibleAction(actions, index, step); return true;
                 }
                 if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
-                    heroOpen.requestFocus();
+                    if (libraryVisible) {
+                        int selected = adapter.indexOf(lastFocused);
+                        focusGrid(selected >= 0 ? selected : adapter.firstApp());
+                    } else if (heroOpen.isEnabled()) heroOpen.requestFocus();
                     return true;
                 }
                 return false;
@@ -430,7 +433,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (next == GridNavigation.TOP_BAR) {
             pendingGridPosition = RecyclerView.NO_POSITION;
             if (dockAdapter.firstApp() >= 0) focusDock(dockAdapter.firstApp());
-            else heroOpen.requestFocus();
+            else firstTopAction().requestFocus();
         }
         else if (next != from) focusGrid(next);
         return true;
@@ -585,7 +588,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         String[] labels = new String[inputsFound.size()];
         for (int i = 0; i < labels.length; i++) {
             TvInputInfo input = inputsFound.get(i);
-            CharSequence label = input.loadCustomLabel(this);
+            CharSequence label = Build.VERSION.SDK_INT >= 24 ? input.loadCustomLabel(this) : null;
             if (label == null || label.length() == 0) label = input.loadLabel(this);
             labels[i] = label == null ? input.getId() : label.toString();
         }
@@ -649,7 +652,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         dock.setVisibility(show || dockAdapter.firstApp() < 0 ? View.GONE : View.VISIBLE);
         View hero = findViewById(R.id.hero);
         LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) hero.getLayoutParams();
-        params.height = show ? AppAdapter.dp(this, compact ? 86 : 94) : 0;
+        params.height = show ? AppAdapter.dp(this, compact ? 48 : 56) : 0;
         params.weight = show ? 0 : 1;
         hero.setLayoutParams(params);
         heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, show ? 26 : compact ? 44 : 56);
@@ -657,6 +660,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         findViewById(R.id.hero_hint).setVisibility(show || compact ? View.GONE : View.VISIBLE);
         findViewById(R.id.hero_mark).setVisibility(View.GONE);
         findViewById(R.id.shelf_label).setVisibility(View.GONE);
+        findViewById(R.id.hero_buttons).setVisibility(show ? View.GONE : View.VISIBLE);
         LinearLayout.LayoutParams buttons = (LinearLayout.LayoutParams) findViewById(R.id.hero_buttons).getLayoutParams();
         buttons.topMargin = AppAdapter.dp(this, show ? 8 : 18);
         findViewById(R.id.hero_buttons).setLayoutParams(buttons);
