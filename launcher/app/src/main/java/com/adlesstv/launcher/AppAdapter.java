@@ -158,8 +158,9 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         holder.tile.setOnClickListener(v -> listener.opened(app));
         holder.tile.setOnLongClickListener(v -> { listener.options(app); return true; });
         holder.tile.animate().cancel();
-        holder.tile.setScaleX(holder.tile.isFocused() ? 1.035f : 1f);
-        holder.tile.setScaleY(holder.tile.isFocused() ? 1.035f : 1f);
+        float initialScale = reducedMotion ? 1f : (holder.tile.isFocused() ? 1.035f : 1f);
+        holder.tile.setScaleX(initialScale);
+        holder.tile.setScaleY(initialScale);
         holder.tile.setTranslationZ(holder.tile.isFocused() ? dp(context, 8) : 0f);
         holder.tile.setOnFocusChangeListener((v, focused) -> {
             animateFocus(v, focused, reducedMotion);
