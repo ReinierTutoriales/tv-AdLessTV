@@ -49,6 +49,9 @@
                 android:layout_marginStart="10dp" android:text="@string/app_details" />
         </LinearLayout>
     </LinearLayout>
+    <View android:id="@+id/idle_spacer"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:importantForAccessibility="no" />
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/dock"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="16dp" android:layout_marginBottom="12dp"
