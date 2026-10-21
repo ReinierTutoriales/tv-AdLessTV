@@ -330,9 +330,14 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             settings.requestFocus();
             return;
         }
-        if (inDock >= 0 || (inGrid < 0 && dockAdapter.firstApp() >= 0))
+        // Preserve the catalog state when the package list refreshes.
+        if (catalogContainer.getVisibility() == View.VISIBLE && inGrid >= 0) {
+            focusGrid(inGrid);
+        } else if (inDock >= 0 || dockAdapter.firstApp() >= 0) {
             focusDock(inDock >= 0 ? inDock : dockAdapter.firstApp());
-        else focusGrid(inGrid >= 0 ? inGrid : adapter.firstApp());
+        } else {
+            focusGrid(inGrid >= 0 ? inGrid : adapter.firstApp());
+        }
     }
 
     private void focusDock(int position) {
