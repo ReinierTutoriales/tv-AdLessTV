@@ -224,7 +224,9 @@ public class HomeUiTest {
                 if (holder != null && holder.itemView.requestFocus()) dockPosition.set(1);
             });
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
-            context.startActivity(new Intent(homeIntent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            // ActivityScenario adds CLEAR_TASK to its launch Intent. Do not copy that test-only
+            // flag into the second HOME delivery: it would destroy the very instance under test.
+            context.startActivity(new Intent(homeIntent).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             waitUntil(scenario, activity -> {
                 RecyclerView dock = activity.findViewById(R.id.dock);
                 View tile = dock.findContainingItemView(activity.getCurrentFocus());
