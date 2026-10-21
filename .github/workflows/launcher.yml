@@ -15,12 +15,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
@@ -30,7 +30,7 @@ jobs:
         run: ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease :app:lintDebug :app:testDebugUnitTest
       - name: Preserve lint report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: AdLessTV-lint-report
           path: |
@@ -52,6 +52,21 @@ jobs:
               exit 1
             fi
           done
+      - name: Record APK identity and enforce size budgets
+        run: |
+          mkdir -p apk-evidence
+          git rev-parse HEAD > apk-evidence/commit.txt
+          python - <<'PY'
+          from pathlib import Path
+          limits = {'debug/app-debug.apk': 8, 'release/app-release-unsigned.apk': 3}
+          for name, mib in limits.items():
+              apk = Path('launcher/app/build/outputs/apk') / name
+              size = apk.stat().st_size
+              print(f'{name}: {size} bytes; limit {mib} MiB')
+              if not 0 < size <= mib * 1024 * 1024:
+                  raise SystemExit(f'APK exceeds budget: {name}')
+          PY
+          sha256sum launcher/app/build/outputs/apk/debug/*.apk launcher/app/build/outputs/apk/release/*.apk > apk-evidence/SHA256SUMS.txt
       - name: Exercise local release signing with an ephemeral CI key
         working-directory: launcher
         run: |
@@ -66,10 +81,12 @@ jobs:
           ./gradlew --no-daemon :app:assembleRelease
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
           rm -f ci-release.jks keystore.properties
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: AdLessTV-debug-apk
-          path: launcher/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            launcher/app/build/outputs/apk/debug/app-debug.apk
+            apk-evidence/
           retention-days: 7
 
   ui:
@@ -90,13 +107,13 @@ jobs:
             arch: x86
             profile: tv_1080p
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
@@ -104,7 +121,7 @@ jobs:
         run: sudo chmod 666 /dev/kvm
       - run: chmod +x launcher/gradlew
       - name: Layout and D-pad on Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc # v2.38.0
         with:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
@@ -115,7 +132,7 @@ jobs:
           script: bash launcher/check-emulator.sh
       - name: Preserve UI evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: AdLessTV-ui-tests-${{ matrix.name }}
           path: |

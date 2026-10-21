@@ -312,6 +312,16 @@ class HomeTests(unittest.TestCase):
         with self.assertRaises(ValueError): home.restore(self.dev, self.path)
         self.assertEqual(self.dev.commands, [])
 
+    def test_restore_does_not_change_home_from_another_visible_user(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            home.activate(self.dev, self.path)
+        self.dev.current_user = '10'
+        self.dev.commands.clear()
+        with self.assertRaisesRegex(ValueError, 'usuario visible'):
+            home.restore(self.dev, self.path)
+        self.assertEqual(self.dev.commands, ['am get-current-user'])
+        self.assertEqual(self.dev.current, home.NEW_HOME)
+
     def test_restore_rejects_command_injection_in_snapshot(self):
         self.path.write_text(json.dumps({'version': 1, 'device': self.dev.ident,
             'previous': 'com.factory.home/.Home; reboot', 'new': home.NEW_HOME, 'status': 'pending'}))

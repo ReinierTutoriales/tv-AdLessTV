@@ -31,7 +31,6 @@ import android.window.OnBackInvokedDispatcher;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.LinearLayout;
-import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -84,6 +83,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private TextView heroName;
     private AppRepository.App selectedApp;
     private String lastFocused;
+    private String lastDockFocused;
     private boolean resumed;
     private boolean dirty = true;
     private boolean scanning;
@@ -97,7 +97,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        if (state != null) lastFocused = state.getString("focused_app");
+        if (state != null) {
+            lastFocused = state.getString("focused_app");
+            lastDockFocused = state.getString("focused_dock_app");
+        }
         View root = findViewById(R.id.root);
         if (Build.VERSION.SDK_INT >= 30) {
             root.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -143,7 +146,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         adapter = new AppAdapter(this, this, artwork, false);
         adapter.setReducedMotion(repository.reducedMotion());
         dockAdapter = new AppAdapter(this, new AppAdapter.Listener() {
-            @Override public void focused(AppRepository.App app) { MainActivity.this.focused(app); }
+            @Override public void focused(AppRepository.App app) {
+                lastDockFocused = app.key();
+                MainActivity.this.focused(app);
+            }
             @Override public void opened(AppRepository.App app) { openApp(app); }
             @Override public void options(AppRepository.App app) { showOptions(app); }
             @Override public boolean navigate(int position, int key) { return navigateDock(position, key); }
@@ -153,6 +159,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         dock.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
         dock.setAdapter(dockAdapter);
         dock.setItemAnimator(null);
+        root.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updateDockGeometry());
         dock.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
         layout = new GridLayoutManager(this, 4);
         layout.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
@@ -213,6 +220,31 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         }
     }
 
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (Intent.ACTION_MAIN.equals(intent.getAction()) && intent.hasCategory(Intent.CATEGORY_HOME)) {
+            // singleTask reuses this Activity: HOME must close the library, not leave its old scroll state.
+            returnToShelf();
+        }
+    }
+
+    private void updateDockGeometry() {
+        View root = findViewById(R.id.root);
+        int available = root.getWidth() - root.getPaddingLeft() - root.getPaddingRight();
+        int count = dockAdapter.getItemCount();
+        if (available <= 0 || count == 0) return;
+        int slots = Math.min(4, count);
+        int width = Math.min(AppAdapter.dp(this, compact ? 148 : 190),
+                (available - AppAdapter.dp(this, 24)) / slots - AppAdapter.dp(this, 10));
+        dockAdapter.setDockWidth(Math.max(1, width));
+        int bandWidth = Math.min(available, slots * (width + AppAdapter.dp(this, 10)) + AppAdapter.dp(this, 24));
+        if (dock.getLayoutParams().width != bandWidth) {
+            dock.getLayoutParams().width = bandWidth;
+            dock.requestLayout();
+        }
+    }
+
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
         if (focused) hideSystemBars();
@@ -246,6 +278,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     @Override protected void onSaveInstanceState(@NonNull Bundle state) {
         state.putString("focused_app", lastFocused);
+        state.putString("focused_dock_app", lastDockFocused);
         super.onSaveInstanceState(state);
     }
 
@@ -312,8 +345,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             if (!hidden.contains(app.packageName()) && !pinnedKeys.contains(app.key())) rest.add(app);
         }
         dockAdapter.replace(pinned, Collections.emptyList());
+        updateDockGeometry();
         dock.setVisibility(libraryVisible || pinned.isEmpty() ? View.GONE : View.VISIBLE);
-        findViewById(R.id.shelf_label).setVisibility(libraryVisible || pinned.isEmpty() ? View.GONE : View.VISIBLE);
+        findViewById(R.id.shelf_label).setVisibility(View.GONE);
         adapter.replace(Collections.emptyList(), rest);
         findViewById(R.id.library_hint).setVisibility(rest.isEmpty() ? View.GONE : View.VISIBLE);
         if (pinned.isEmpty()) showLibrary(true);
@@ -411,7 +445,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (key != KeyEvent.KEYCODE_DPAD_LEFT && key != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
         int step = key == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1;
         if (dock.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) step = -step;
-        int next = position + step;
+        int next = (pendingDockPosition >= 0 ? pendingDockPosition : position) + step;
         if (next >= 0 && next < dockAdapter.getItemCount()) focusDock(next);
         return true;
     }
@@ -551,7 +585,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         String[] labels = new String[inputsFound.size()];
         for (int i = 0; i < labels.length; i++) {
             TvInputInfo input = inputsFound.get(i);
-            CharSequence label = input.loadLabel(this);
+            CharSequence label = input.loadCustomLabel(this);
+            if (label == null || label.length() == 0) label = input.loadLabel(this);
             labels[i] = label == null ? input.getId() : label.toString();
         }
         new AlertDialog.Builder(this).setTitle(R.string.inputs).setItems(labels, (dialog, index) -> {
@@ -600,8 +635,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void updateHero() {
         heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
-        ((ImageView) findViewById(R.id.hero_mark)).setImageBitmap(
-                selectedApp == null ? null : artwork.icon(selectedApp));
         heroOpen.setEnabled(selectedApp != null);
         heroInfo.setEnabled(selectedApp != null);
         VisualTheme.applyAccent(this, repository.visualTheme(), findViewById(R.id.root),
@@ -619,18 +652,18 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         params.height = show ? AppAdapter.dp(this, compact ? 86 : 94) : 0;
         params.weight = show ? 0 : 1;
         hero.setLayoutParams(params);
-        heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, show ? 26 : compact ? 48 : 64);
+        heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, show ? 26 : compact ? 44 : 56);
         findViewById(R.id.hero_kicker).setVisibility(show ? View.GONE : View.VISIBLE);
         findViewById(R.id.hero_hint).setVisibility(show || compact ? View.GONE : View.VISIBLE);
-        findViewById(R.id.hero_mark).setVisibility(show ? View.GONE : View.VISIBLE);
-        findViewById(R.id.shelf_label).setVisibility(show || dock.getVisibility() != View.VISIBLE ? View.GONE : View.VISIBLE);
+        findViewById(R.id.hero_mark).setVisibility(View.GONE);
+        findViewById(R.id.shelf_label).setVisibility(View.GONE);
         LinearLayout.LayoutParams buttons = (LinearLayout.LayoutParams) findViewById(R.id.hero_buttons).getLayoutParams();
         buttons.topMargin = AppAdapter.dp(this, show ? 8 : 18);
         findViewById(R.id.hero_buttons).setLayoutParams(buttons);
     }
 
     private void returnToShelf() {
-        int selected = dockAdapter.indexOf(lastFocused);
+        int selected = dockAdapter.indexOf(lastDockFocused);
         if (dockAdapter.firstApp() >= 0) focusDock(selected >= 0 ? selected : dockAdapter.firstApp());
         else settings.requestFocus();
     }

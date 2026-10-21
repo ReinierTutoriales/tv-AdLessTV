@@ -13,8 +13,8 @@ jobs:
         python: ['3.11', '3.13']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-python@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r tools/requirements.txt
@@ -22,13 +22,13 @@ jobs:
       - name: Bash syntax
         if: runner.os == 'Linux'
         run: |
-          for file in tools/disable.sh tools/restore.sh; do
+          for file in tools/*.sh launcher/*.sh; do
             bash -n "$file"
           done
       - name: PowerShell syntax
         shell: pwsh
         run: |
-          foreach ($file in Get-ChildItem tools/*.ps1) {
+          foreach ($file in Get-ChildItem tools/*.ps1, launcher/*.ps1) {
             $parseErrors = $null
             $tokens = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)

@@ -49,7 +49,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Listener listener;
     private final ArtworkLoader artwork;
     private final boolean dock;
-    private final int dockWidth;
+    private int dockWidth;
     private int columns = 4;
     private boolean reducedMotion;
     private GridNavigation navigation = new GridNavigation(new boolean[0], 4);
@@ -95,6 +95,12 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         items.addAll(next);
         updateNavigation();
         changes.dispatchUpdatesTo(this);
+    }
+
+    void setDockWidth(int width) {
+        if (!dock || dockWidth == width) return;
+        dockWidth = width;
+        notifyItemRangeChanged(0, getItemCount());
     }
 
     void setColumns(int columns) { this.columns = columns; updateNavigation(); }
@@ -154,14 +160,15 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (entry.app == null) { ((TextView) base.itemView).setText(entry.heading); return; }
         Holder holder = (Holder) base;
         AppRepository.App app = entry.app;
+        if (dock) holder.tile.getLayoutParams().width = dockWidth;
         holder.tile.label.setText(app.label);
         holder.tile.setContentDescription(app.label);
         artwork.bind(holder.tile.icon, app, holder.tile::setAccent);
         holder.tile.setOnClickListener(v -> listener.opened(app));
         holder.tile.setOnLongClickListener(v -> { listener.options(app); return true; });
         holder.tile.animate().cancel();
-        holder.tile.setScaleX(holder.tile.isFocused() ? 1.035f : 1f);
-        holder.tile.setScaleY(holder.tile.isFocused() ? 1.035f : 1f);
+        holder.tile.setScaleX(holder.tile.isFocused() && !reducedMotion ? 1.05f : 1f);
+        holder.tile.setScaleY(holder.tile.isFocused() && !reducedMotion ? 1.05f : 1f);
         holder.tile.setOnFocusChangeListener((v, focused) -> {
             animateFocus(v, focused, reducedMotion);
             if (focused) listener.focused(app);
@@ -192,14 +199,14 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
     static void animateFocus(View view, boolean focused, boolean reducedMotion) {
         view.animate().cancel();
-        float scale = focused ? 1.035f : 1f;
+        float scale = focused ? 1.05f : 1f;
         if (reducedMotion) {
             view.setScaleX(1f);
             view.setScaleY(1f);
         } else view.animate().scaleX(scale).scaleY(scale).setDuration(120).start();
     }
 
-    /** The app icon and label sit directly on an opaque native gradient. */
+    /** Native 16:9 TV art, rounded focus surface and a separate readable app name. */
     static final class Tile extends FrameLayout {
         final ImageView icon;
         final TextView label;
@@ -219,26 +226,40 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             StateListDrawable states = new StateListDrawable();
             states.addState(new int[]{android.R.attr.state_focused}, focused);
             states.addState(new int[0], normal);
-            setBackground(states);
+            FrameLayout card = new FrameLayout(context);
+            card.setId(View.generateViewId());
+            card.setDuplicateParentStateEnabled(true);
+            card.setBackground(states);
+            card.setClipToOutline(true);
+            addView(card, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
             setAccent(0);
-            int padding = dp(context, 12);
-            setPadding(padding, padding, padding, padding);
             icon = new ImageView(context);
             icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
             icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            addView(icon, new LayoutParams(dp(context, 38), dp(context, 38), Gravity.TOP | Gravity.END));
+            card.addView(icon, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+            // Draw the focus stroke above the artwork, which would otherwise cover it.
+            GradientDrawable ring = new GradientDrawable();
+            ring.setColor(Color.TRANSPARENT);
+            ring.setCornerRadius(dp(context, 16));
+            ring.setStroke(dp(context, 2), Color.WHITE);
+            StateListDrawable foreground = new StateListDrawable();
+            foreground.addState(new int[]{android.R.attr.state_focused}, ring);
+            foreground.addState(new int[0], new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            card.setForeground(foreground);
             label = new TextView(context);
-            label.setTextColor(Color.rgb(240, 242, 247));
-            label.setTextSize(16);
-            label.setGravity(Gravity.START);
+            label.setTextColor(Color.rgb(224, 227, 234));
+            label.setTextSize(14);
+            label.setGravity(Gravity.CENTER);
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setIncludeFontPadding(false);
-            label.setTypeface(null, android.graphics.Typeface.BOLD);
             label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             addView(label, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
         }
+
         void setAccent(int color) {
             if (accent == color) return;
             accent = color;
@@ -254,8 +275,10 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
         @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             int width = MeasureSpec.getSize(widthMeasureSpec);
-            int content = Math.round(label.getTextSize()) + getPaddingTop() + getPaddingBottom() + dp(getContext(), 44);
-            int height = Math.max(Math.round(width * 0.64f), content);
+            int artHeight = Math.round(width * 9f / 16f);
+            View card = getChildAt(0);
+            card.getLayoutParams().height = artHeight;
+            int height = artHeight + Math.round(label.getTextSize() * 1.35f) + dp(getContext(), 10);
             super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
         }
     }

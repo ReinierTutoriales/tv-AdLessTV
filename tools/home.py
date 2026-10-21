@@ -233,6 +233,7 @@ def disable_stock(device, snapshot_path, expected_package):
 def restore(device, snapshot_path):
     path = Path(snapshot_path)
     data = read_snapshot(path, device)
+    require_user_zero(device)
     if data["status"] == "restored":
         if current_home(device) == data["previous"]:
             print("HOME original ya restaurado.")

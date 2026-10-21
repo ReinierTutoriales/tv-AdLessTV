@@ -10,6 +10,9 @@ $ErrorActionPreference = 'Stop'
 if ($ReplaceStock -and -not $HomeSnapshot) { throw '-ReplaceStock requiere -HomeSnapshot.' }
 if ($BuildOnly -and $HomeSnapshot) { throw '-BuildOnly no se combina con -HomeSnapshot.' }
 if ($HomeSnapshot -and -not $Release) { throw 'Para activar HOME instala un release firmado con -Release.' }
+if ($HomeSnapshot -and (Test-Path -LiteralPath $HomeSnapshot)) {
+    throw 'El respaldo HOME ya existe; usa una ruta nueva antes de instalar.'
+}
 $root = $PSScriptRoot
 if ($Release -and -not (Test-Path -LiteralPath (Join-Path $root 'keystore.properties') -PathType Leaf)) {
     throw 'Falta launcher/keystore.properties para firmar el release.'
@@ -35,7 +38,7 @@ try {
     try { & $Python $client '--host' $TvHost 'rm -f /data/local/tmp/adlesstv-preview.apk' | Out-Null }
     catch { Write-Warning 'No se pudo borrar el APK temporal de la TV; revisa /data/local/tmp cuando vuelva ADB.' }
 }
-if ($installCode -ne 0 -or $result -notmatch 'Success') { throw "Instalación fallida: $result" }
+if ($installCode -ne 0 -or ($result -join "`n") -notmatch '(?m)^Success\s*$' ) { throw "Instalación fallida: $result" }
 $result = & $Python $client '--host' $TvHost 'am start -W -n com.adlesstv.launcher/.MainActivity'
 if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Status: ok\s*$' -or
     ($result -join "`n") -match '(?im)^Error:') { throw "El lanzador no inició: $result" }

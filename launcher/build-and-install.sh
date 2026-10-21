@@ -26,6 +26,9 @@ fi
 if [[ -n "$HOME_SNAPSHOT" && "$RELEASE" != 1 ]]; then
   echo 'Para activar HOME instala un release firmado con --release.' >&2; exit 2
 fi
+if [[ -n "$HOME_SNAPSHOT" && -e "$HOME_SNAPSHOT" ]]; then
+  echo 'El respaldo HOME ya existe; usa una ruta nueva antes de instalar.' >&2; exit 2
+fi
 if [[ "$RELEASE" == 1 ]]; then
   [[ -f "$ROOT/keystore.properties" ]] || {
     echo 'Falta launcher/keystore.properties para firmar el release.' >&2; exit 2;
@@ -49,11 +52,13 @@ else
 fi
 # The APK is staged in /data/local/tmp; keep no extra copy on an 8 GB stick.
 "$PY" "$ROOT/../tools/tv.py" 'rm -f /data/local/tmp/adlesstv-preview.apk' >/dev/null || true
-if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
+result="${result//$'\r'/}"
+if [[ "$install_status" != 0 || ! "$result" =~ (^|$'\n')Success($|$'\n') ]]; then
   printf 'Instalación fallida: %s\n' "$result" >&2; exit 1
 fi
 result="$("$PY" "$ROOT/../tools/tv.py" 'am start -W -n com.adlesstv.launcher/.MainActivity')"
-if [[ ! "$result" =~ (^|$'\n')Status:\ ok($|$'\n') || "$result" =~ (^|$'\n')Error: ]]; then
+result="${result//$'\r'/}"
+if [[ ! "$result" =~ (^|$'\n')Status:\ ok($|$'\n') || "$result" =~ (^|$'\n')[Ee][Rr][Rr][Oo][Rr]: ]]; then
   printf 'El lanzador no inició: %s\n' "$result" >&2; exit 1
 fi
 if [[ -n "$HOME_SNAPSHOT" ]]; then

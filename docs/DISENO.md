@@ -63,3 +63,12 @@ Publicar el perfil de ese modelo solo con resultados observados y límites de la
 Las herramientas tienen regresiones en Linux y Windows. Pendiente: conexión, lectura de estados, aplicación y restauración sobre firmware real. Para el lanzador: la CI compila debug y release, ejecuta Android Lint y comprueba que ninguno de los APK solicite permisos fuera del interno para proteger receptores dinámicos; la tarea de emulador prueba tamaños 960 × 540 y 720 × 480 con fuente ampliada, nombres largos, cambios de sección y visibilidad del foco. Guarda capturas de apps instaladas y de un catálogo artificial de prueba. Faltan pruebas en TV física, mediciones comparables de arranque/memoria y validación de entradas por fabricante.
 
 El Activity HOME es `singleTask` y Direct-Boot aware. Desde API 24, sus preferencias locales se guardan en almacenamiento protegido del dispositivo y migran las elecciones anteriores después de desbloquear. No usa un servicio permanente ni un receptor de arranque que intente eludir las restricciones de actividades en segundo plano. La CI de emulador selecciona HOME, reinicia, comprueba que aparece solo, desactiva el HOME anterior, repite el reinicio y restaura. Un firmware de TV que imponga otra actividad al arrancar requiere validación específica.
+
+
+## Revisión 0.3.0-preview.2
+
+La [revisión operativa](REVISION_OPERATIVA.md) sustituye las descripciones visuales
+de preview.1: las tarjetas usan banners locales 16:9 de 256 × 144 RGB_565, el dock
+se centra en una banda ajustada y se elimina el icono decorativo de la cabecera.
+El nombre se sitúa fuera del arte. La carga se comparte por componente y
+generación. HOME cierra la biblioteca y conserva la selección del dock.

@@ -209,6 +209,31 @@ public class HomeUiTest {
         }
     }
 
+    @Test public void homeIntentReturnsToThePreviouslyFocusedDockApp() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            AtomicInteger dockPosition = new AtomicInteger();
+            scenario.onActivity(activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                if (dock.getAdapter().getItemCount() < 2) return;
+                RecyclerView.ViewHolder holder = dock.findViewHolderForAdapterPosition(1);
+                if (holder != null && holder.itemView.requestFocus()) dockPosition.set(1);
+            });
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+            scenario.onActivity(activity -> activity.onNewIntent(new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)));
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View tile = dock.findContainingItemView(activity.getCurrentFocus());
+                return activity.findViewById(R.id.library).getVisibility() == View.GONE
+                        && tile != null && dock.getChildAdapterPosition(tile) == dockPosition.get();
+            });
+            scenario.onActivity(this::checkViewport);
+            screenshot("home-return.png");
+        }
+    }
+
     /** Only the artificial-catalog test suspends package events; the installed-app test stays live. */
     private final class FixedCatalog implements AutoCloseable {
         private final ActivityScenario<MainActivity> scenario;
@@ -281,6 +306,9 @@ public class HomeUiTest {
             Rect bounds = new Rect();
             assertTrue(dockTile.getGlobalVisibleRect(bounds));
             assertTrue("Focused dock tile clipped", dockViewport.contains(bounds));
+            View art = ((android.view.ViewGroup) dockTile).getChildAt(0);
+            assertEquals("TV artwork must retain a 16:9 ratio", 16f / 9f,
+                    (float) art.getWidth() / art.getHeight(), 0.03f);
         }
     }
 

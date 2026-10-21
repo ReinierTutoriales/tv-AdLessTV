@@ -10,14 +10,14 @@ import android.view.View;
 /** One opaque base and a native radial accent; no background bitmap or blur. */
 final class VisualTheme {
     static final int COUNT = 3;
-    private static final int[] BACKGROUND = {0xFF090B10, 0xFF0A1018, 0xFF120E10};
+    private static final int[] BACKGROUND = {0xFF000000, 0xFF0A1018, 0xFF120E10};
     private static final int[] ACCENT = {0xFF454B63, 0xFF36728E, 0xFF9A6555};
 
     private VisualTheme() { }
 
     static void apply(Context context, int choice, View root, View hero, View dock) {
         hero.setBackground(null);
-        dock.setBackground(null);
+        dock.setBackgroundResource(R.drawable.dock_surface);
         applyAccent(context, choice, root, 0);
     }
 
@@ -37,6 +37,6 @@ final class VisualTheme {
         ((ColorDrawable) background.getDrawable(0)).setColor(BACKGROUND[index]);
         int hue = accent == 0 ? ACCENT[index] : accent;
         ((GradientDrawable) background.getDrawable(1)).setColors(
-                new int[]{0x50000000 | (hue & 0xFFFFFF), hue & 0xFFFFFF});
+                new int[]{0x78000000 | (hue & 0xFFFFFF), hue & 0xFFFFFF});
     }
 }
