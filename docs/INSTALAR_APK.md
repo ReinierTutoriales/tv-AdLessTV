@@ -31,7 +31,11 @@ El modo completo instala y abre la app, identifica el HOME efectivo y los
 competidores, comprueba usuario/firmware/funciones protegidas/Wi-Fi, guarda los
 estados originales y desactiva exclusivamente esos competidores conocidos. Se
 vuelve a seleccionar AdLessTV después de cada cambio de candidatos. No toca
-voz, Cast, actualizaciones, tienda, teclado ni paquetes desconocidos.
+los paquetes de voz, Cast, actualizaciones, tienda, teclado ni paquetes desconocidos.
+Si el asistente contiene `CastInfoProvider`, o el equipo es un Chromecast/Streamer
+con esa dependencia conocida, bloquea el reemplazo completo para conservar Cast.
+En algunos onn, desactivar launcherx también afecta los botones YouTube/Free TV
+que el fabricante dirige a ese launcher; prueba esos botones con el mando físico.
 
 Un fallo de instalación o firma detiene el flujo antes de HOME. No se desinstala
 la app anterior para forzar una firma distinta. Las claves debug de ejecuciones

@@ -50,6 +50,19 @@ def save_new(path, data):
         os.fsync(stream.fileno())
 
 
+
+def check_setup_functions(device, targets):
+    if SETUP not in targets:
+        return
+    codename = shell(device, "getprop ro.product.device").strip()
+    report = shell(device, "dumpsys package " + SETUP)
+    if not report.strip() or "Permission Denial" in report:
+        raise ValueError("No se pudieron revisar las funciones del asistente; se conserva activo.")
+    if codename in {"sabrina", "boreal", "kirkwood"} or "castinfoprovider" in report.lower():
+        raise ValueError("Este asistente proporciona credenciales de Cast; se conserva activo. "
+                         "El reemplazo HOME completo no se aplicará a este firmware.")
+
+
 def plan(device):
     require_user_zero(device)
     previous = home.current_home(device)
@@ -73,6 +86,7 @@ def plan(device):
     blocked = targets & protected_packages(device, include_home=False)
     if blocked:
         raise ValueError("Un competidor HOME cumple otra función protegida: " + ", ".join(sorted(blocked)))
+    check_setup_functions(device, targets)
     check_wifi_provisioning(device, targets)
     entries = []
     for package in sorted(targets, key=lambda p: (p != SETUP, p)):
@@ -199,6 +213,7 @@ def apply(device, candidate, path):
                 raise ValueError("Apareció un HOME no revisado durante la operación.")
             if entry["package"] in protected_packages(device, include_home=False):
                 raise ValueError("El paquete pasó a cumplir una función protegida.")
+            check_setup_functions(device, [entry["package"]])
             check_wifi_provisioning(device, [entry["package"]])
             if package_state(device, entry["package"]) != entry["state"]:
                 raise ValueError("Cambió el estado del paquete durante la operación.")

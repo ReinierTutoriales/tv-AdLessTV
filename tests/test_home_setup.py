@@ -27,6 +27,8 @@ class Device:
         self.boot = '11111111-1111-1111-1111-111111111111'
         self.wifi_report = 'creatorName=android.uid.system'
         self.user = '0'
+        self.codename = 'coffey'
+        self.setup_report = 'Package [com.google.android.tungsten.setupwraith] installed=true'
         self.extra_protected = set()
         self.commands = []
         self.fail_package = None
@@ -38,6 +40,8 @@ class Device:
         if self.disconnect: raise RuntimeError('ADB disconnected')
         if command == 'am get-current-user': return self.user
         if command == 'dumpsys wifi': return self.wifi_report
+        if command == 'getprop ro.product.device': return self.codename
+        if command == 'dumpsys package ' + SETUP: return self.setup_report
         if command == 'getprop ro.build.fingerprint': return self.firmware
         if command == home.RESOLVE: return self.current
         if command == home.QUERY_HOME:
@@ -98,6 +102,13 @@ class HomeSetupTests(unittest.TestCase):
     def test_saved_wifi_owner_blocks_before_any_home_mutation(self):
         for report in ('creatorName=' + SETUP, '', 'unreadable owner fields'):
             self.dev.wifi_report = report
+            with self.assertRaises(ValueError): setup.plan(self.dev)
+        self.assertFalse(any(c.startswith(('pm disable', 'cmd package set-home')) for c in self.dev.commands))
+
+    def test_cast_credentials_dependency_blocks_before_changes(self):
+        for codename, report in [('boreal', 'Package installed'), ('kirkwood', 'Package installed'),
+                                 ('coffey', 'Provider ...castinfo.CastInfoProvider'), ('coffey', '')]:
+            self.dev.codename, self.dev.setup_report = codename, report
             with self.assertRaises(ValueError): setup.plan(self.dev)
         self.assertFalse(any(c.startswith(('pm disable', 'cmd package set-home')) for c in self.dev.commands))
 
