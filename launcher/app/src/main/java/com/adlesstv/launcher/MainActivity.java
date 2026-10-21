@@ -15,6 +15,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.Insets;
+import android.graphics.Rect;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -585,7 +586,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
-        if (holder != null && holder.itemView.requestFocus()) {
+        if (holder != null && focusGridTile(holder.itemView)) {
             pendingGridPosition = RecyclerView.NO_POSITION;
             return;
         }
@@ -602,7 +603,20 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         }
         if (pendingGridPosition < 0) return;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(pendingGridPosition);
-        if (holder != null && holder.itemView.requestFocus()) pendingGridPosition = RecyclerView.NO_POSITION;
+        if (holder != null && focusGridTile(holder.itemView)) pendingGridPosition = RecyclerView.NO_POSITION;
+    }
+
+    private boolean focusGridTile(View tile) {
+        if (!tile.requestFocus()) return false;
+        // A recycled, partly visible row can take focus before RecyclerView has
+        // scrolled it into view. Recheck after layout, without moving newer focus.
+        grid.postOnAnimation(() -> {
+            if (tile.isFocused() && tile.isAttachedToWindow()) {
+                grid.requestChildRectangleOnScreen(tile,
+                        new Rect(0, 0, tile.getWidth(), tile.getHeight()), true);
+            }
+        });
+        return true;
     }
 
     @Override public void focused(AppRepository.App app) {
