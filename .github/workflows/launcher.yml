@@ -79,20 +79,22 @@ jobs:
             arch: x86
             profile: tv_1080p
             ram: 2048M
+            gpu: swiftshader_indirect
           - name: tv36
             api: '36'
             target: android-tv
             arch: x86_64
             profile: tv_1080p
             ram: 2048M
-          # Informational: newest platform, no TV image yet. Its CI image is unstable
-          # (storage and system services drop after boot), so it does not gate merges.
+            gpu: swiftshader_indirect
+          # Informational: newest platform, no TV image yet.
           - name: android37
             api: '37.0'
             target: google_apis
             arch: x86_64
             profile: pixel_2
             ram: 3072M
+            gpu: swiftshader
             experimental: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,6 +107,14 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
+      # Emulator Runner prepends cmdline-tools/latest to PATH during its own step.
+      # The runner's old latest creates API 37 AVDs with target=android-0.
+      - name: Select API 37-aware AVD manager
+        if: matrix.experimental == true
+        run: |
+          test -x "$ANDROID_HOME/cmdline-tools/22.0/bin/avdmanager"
+          mv "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/cmdline-tools/runner-original"
+          ln -s 22.0 "$ANDROID_HOME/cmdline-tools/latest"
       - name: Enable hardware virtualization
         run: sudo chmod 666 /dev/kvm
       - run: chmod +x launcher/gradlew
@@ -119,7 +129,8 @@ jobs:
           # The Android 17 image ships a small /data; installs fail without more room.
           disk-size: 6G
           disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -skin 960x540
+          emulator-options: -no-window -gpu ${{ matrix.gpu }} -noaudio -no-boot-anim -camera-back none -skin 960x540
+          pre-emulator-launch-script: test '${{ matrix.api }}' != '37.0' || grep -Fx 'target=android-37.0' "${ANDROID_AVD_HOME:-$HOME/.android/avd}/test.ini"
           script: bash launcher/check-emulator.sh
       - name: Preserve UI evidence
         if: always()

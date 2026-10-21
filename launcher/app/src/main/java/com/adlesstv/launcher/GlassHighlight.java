@@ -14,7 +14,7 @@ final class GlassHighlight implements ViewTreeObserver.OnGlobalFocusChangeListen
     private static final float FOCUS_SCALE = 1.035f;
     private final View glass;
     private final View frame;
-    private final int[] frameOrigin = new int[2];
+    private final int[] glassOrigin = new int[2];
     private final int[] tileOrigin = new int[2];
     private View target;
     private boolean enabled;
@@ -66,13 +66,17 @@ final class GlassHighlight implements ViewTreeObserver.OnGlobalFocusChangeListen
     private void place(boolean animate) {
         View tile = target;
         if (tile == null || !tile.isAttachedToWindow() || !tile.isShown() || tile.getWidth() == 0) { hide(); return; }
-        frame.getLocationInWindow(frameOrigin);
-        tile.getLocationInWindow(tileOrigin);
-        // getLocationInWindow includes the current animated scale; use the final, settled bounds.
+        // Position relative to the overlay's actual drawing origin. On API 37
+        // with visible system bars, the frame's reported origin differs from it.
+        glass.getLocationOnScreen(glassOrigin);
+        glassOrigin[0] -= Math.round(glass.getTranslationX());
+        glassOrigin[1] -= Math.round(glass.getTranslationY());
+        tile.getLocationOnScreen(tileOrigin);
+        // The location includes the current animated scale; use the final, settled bounds.
         float scale = reducedMotion ? 1f : FOCUS_SCALE;
         int width = Math.round(tile.getWidth() * scale), height = Math.round(tile.getHeight() * scale);
-        float centerX = tileOrigin[0] - frameOrigin[0] + tile.getWidth() * tile.getScaleX() / 2f;
-        float centerY = tileOrigin[1] - frameOrigin[1] + tile.getHeight() * tile.getScaleY() / 2f;
+        float centerX = tileOrigin[0] - glassOrigin[0] + tile.getWidth() * tile.getScaleX() / 2f;
+        float centerY = tileOrigin[1] - glassOrigin[1] + tile.getHeight() * tile.getScaleY() / 2f;
         float x = centerX - width / 2f, y = centerY - height / 2f;
         ViewGroup.LayoutParams params = glass.getLayoutParams();
         if (params.width != width || params.height != height) {
