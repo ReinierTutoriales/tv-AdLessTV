@@ -189,6 +189,9 @@ final class AppRepository {
     }
 
     /** Every card declared by an installed app; whether it shows is the user's decision. */
+    // The caption meta-data may be a string or a resource id: the untyped Bundle.get() reads
+    // either without the typed getters' class-cast warnings.
+    @SuppressWarnings("deprecation")
     List<App> scanCards() {
         List<App> result = new ArrayList<>();
         if (!config().moduleCards) return result;

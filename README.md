@@ -73,15 +73,17 @@ El stick normalmente no tiene puertos HDMI de **entrada** ni sintonizador, pero 
 
 ## Construcción e instalación del lanzador
 
-Requiere **JDK 17**, Android SDK **platform 36 / build-tools 36.0.0** y acceso a los repositorios Android/Gradle. Usa Gradle 9.8.1, Android Gradle Plugin 9.4.1, Java y AndroidX RecyclerView. Compila y apunta a Android 16 (API 36), con compatibilidad declarada desde API 23. Android 17 (API 37) ya se publicó, pero el `sdkmanager` del ejecutor de CI aún no encuentra `platforms;android-37`; no se declara compatibilidad comprobada con esa imagen. La CI comprueba Android 15 y Android TV 14; falta comprobar un televisor físico con firmware más reciente. Para crear el APK sin conectar una TV:
+Requiere **JDK 17 o posterior** (la CI usa 21), Android SDK **`platforms;android-37.0`** y **`build-tools;37.0.0`**, y acceso a los repositorios Android/Gradle. Usa Gradle 9.8.2 (el wrapper verifica el SHA-256 de la distribución), Android Gradle Plugin 9.4.1, Java y AndroidX RecyclerView 1.4.0. Compila contra Android 17 (API 37) y apunta a Android 16 (`targetSdk` 36), con compatibilidad declarada desde Android 6 (API 23). La CI prueba la interfaz en Android TV 14 x86 y Android TV 16 x86_64, ambos con 2 GB de RAM; Android 17 se ejecuta como comprobación informativa. Falta comprobar un televisor físico. Para instalar el SDK por línea de comandos: `sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"` y define `ANDROID_HOME` con su ruta. Para crear el APK sin conectar una TV:
 
 ```bash
 bash launcher/build-and-install.sh --build-only
 ```
 
 ```powershell
-.\launcher\build-and-install.ps1 -BuildOnly
+powershell -ExecutionPolicy Bypass -File .\launcher\build-and-install.ps1 -BuildOnly
 ```
+
+En Windows, `-ExecutionPolicy Bypass` permite ejecutar el script descargado solo en esa llamada, sin cambiar la política del sistema.
 
 El APK de depuración queda en `launcher/app/build/outputs/apk/debug/app-debug.apk`. Para instalarlo y **abrirlo como vista previa**, tras preparar ADB como se indica arriba:
 
@@ -90,7 +92,7 @@ PYTHON=.venv/bin/python bash launcher/build-and-install.sh
 ```
 
 ```powershell
-.\launcher\build-and-install.ps1 -TvHost 192.168.1.50 -Python .\.venv\Scripts\python.exe
+powershell -ExecutionPolicy Bypass -File .\launcher\build-and-install.ps1 -TvHost 192.168.1.50 -Python .\.venv\Scripts\python.exe
 ```
 
 Antes de transferir nada, el script lee la versión de Android de la TV y comprueba que declare `android.software.leanback`; si la API es inferior a la mínima del APK o no es una TV, se detiene sin tocarla. Si la versión instalada está firmada con otra clave (otro ordenador genera otra clave de depuración), la instalación falla con una explicación y **no se desinstala nada automáticamente**: si AdLessTV es HOME, restaura antes el HOME anterior.

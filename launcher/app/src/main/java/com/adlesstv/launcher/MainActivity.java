@@ -1203,7 +1203,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         }
     }
 
+    // Android 12 and older still dispatch Back here; 13+ uses the OnBackInvokedCallback above.
     @SuppressLint("GestureBackNavigation")
+    @SuppressWarnings("deprecation")
     @Override public void onBackPressed() {
         returnToDock();
     }

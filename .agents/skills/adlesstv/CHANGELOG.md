@@ -1,4 +1,7 @@
 # Changelog
+## 2026-10-21 (0.3.2)
+- Instalación compatible con la salida de pm de Android 6/7; foco conservado al volver con Inicio; cristal tras abrir el catálogo; tema tras desbloquear
+- Sintaxis de Gradle preparada para Gradle 10; compilador sin avisos de obsolescencia
 ## 2026-10-21 (2)
 - Temas sin recompilar (tools/theme.py), fondo de pantalla, saludo, resaltado de cristal, biblioteca de apps, reloj por inactividad
 - Botón de red con tipo y nombre (opcional), servicio opcional de botones del mando (tools/keys.py), tarjetas de otras apps
