@@ -212,7 +212,9 @@ public class HomeUiTest {
 
     @Test public void homeIntentReturnsToThePreviouslyFocusedDockApp() throws Exception {
         Context context = instrumentation.getTargetContext();
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+        Intent homeIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .setComponent(new ComponentName(context, MainActivity.class));
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(homeIntent)) {
             waitForCatalog(scenario);
             AtomicInteger dockPosition = new AtomicInteger();
             scenario.onActivity(activity -> {
@@ -222,8 +224,7 @@ public class HomeUiTest {
                 if (holder != null && holder.itemView.requestFocus()) dockPosition.set(1);
             });
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
-            scenario.onActivity(activity -> activity.onNewIntent(new Intent(Intent.ACTION_MAIN)
-                    .addCategory(Intent.CATEGORY_HOME)));
+            context.startActivity(new Intent(homeIntent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             waitUntil(scenario, activity -> {
                 RecyclerView dock = activity.findViewById(R.id.dock);
                 View tile = dock.findContainingItemView(activity.getCurrentFocus());

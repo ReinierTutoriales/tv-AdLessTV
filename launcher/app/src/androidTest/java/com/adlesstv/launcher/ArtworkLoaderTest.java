@@ -51,7 +51,9 @@ public class ArtworkLoaderTest {
                 assertEquals(144, first.getHeight());
                 assertEquals(Bitmap.Config.RGB_565, first.getConfig());
                 assertTrue(first.getAllocationByteCount() <= 74_000);
-                assertNull(bound[2].getDrawable());
+                assertTrue("Cancelled view must not receive decoded art", bound[2].getDrawable() == null
+                        || ((BitmapDrawable) bound[2].getDrawable()).getBitmap() == null);
+                assertNull(bound[2].getTag());
                 loader.get().invalidate();
                 assertNull(loader.get().bitmap(app));
             });

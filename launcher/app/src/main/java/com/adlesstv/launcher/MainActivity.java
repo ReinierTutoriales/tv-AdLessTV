@@ -636,6 +636,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     void showLibrary(boolean show) {
         if (libraryVisible == show) return;
         libraryVisible = show;
+        ((TextView) findViewById(R.id.library_hint)).setText(show
+                ? R.string.long_press_hint : R.string.library_hint);
         findViewById(R.id.library).setVisibility(show ? View.VISIBLE : View.GONE);
         dock.setVisibility(show || dockAdapter.firstApp() < 0 ? View.GONE : View.VISIBLE);
         View hero = findViewById(R.id.hero);
