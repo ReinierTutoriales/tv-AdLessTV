@@ -4,19 +4,21 @@
     [string]$TvHost = $env:TV_HOST,
     [ValidateRange(1, 65535)][int]$Port = 5555,
     [switch]$MakeHome,
+    [switch]$HomeOnly,
     [switch]$PlanOnly,
     [string]$BackupDirectory = (Join-Path $PSScriptRoot 'backups'),
     [string]$Python
 )
 $ErrorActionPreference = 'Stop'
+if ($HomeOnly) { $MakeHome = $true }
 if (-not $TvHost) { throw 'Indica -TvHost con la IP del televisor.' }
-if (-not (Test-Path -LiteralPath $Apk -PathType Leaf)) { throw "No existe el APK: $Apk" }
+if (-not $HomeOnly -and -not (Test-Path -LiteralPath $Apk -PathType Leaf)) { throw "No existe el APK: $Apk" }
 if (-not $Adb) {
     $localAdb = Join-Path $PSScriptRoot 'adb.exe'
     $Adb = if (Test-Path -LiteralPath $localAdb) { $localAdb } else { 'adb' }
 }
 $adbCommand = (Get-Command $Adb -ErrorAction Stop).Source
-$Apk = (Resolve-Path -LiteralPath $Apk).Path
+if (-not $HomeOnly) { $Apk = (Resolve-Path -LiteralPath $Apk).Path }
 $tool = Join-Path $PSScriptRoot 'tools\home_setup.py'
 if (-not (Test-Path -LiteralPath $tool)) { $tool = Join-Path $PSScriptRoot '..\tools\home_setup.py' }
 $pythonArguments = @()
@@ -41,9 +43,11 @@ $state = & $adbCommand -s $serial get-state
 if ($LASTEXITCODE -ne 0 -or ($state -join "`n").Trim() -ne 'device') {
     throw 'Acepta la autorización ADB en la TV y vuelve a ejecutar.'
 }
+if (-not $HomeOnly) {
 $result = & $adbCommand -s $serial install -r $Apk
 if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Success\s*$') {
     throw "No se instaló el APK; HOME sigue intacto. Conserva el error de firma si aparece: $result"
+}
 }
 $result = & $adbCommand -s $serial shell am start -W -n 'com.adlesstv.launcher/.MainActivity'
 if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch '(?m)^Status: ok\s*$' -or

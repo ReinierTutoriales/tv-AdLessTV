@@ -24,6 +24,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apk.ps1 -TvHost 19
 `-ExecutionPolicy Bypass` solo se aplica a este proceso de PowerShell. No cambia
 la política permanente del equipo. Sustituye la IP cuando corresponda.
 
+Si ya tienes esta versión del launcher instalada y solo falta la persistencia,
+ejecuta la misma línea con `-HomeOnly` en lugar de `-MakeHome`. Comprueba que la app
+abre y configura HOME sin reinstalarla; así conserva también su firma actual.
+
 Para instalar y abrir únicamente la vista previa, omite `-MakeHome`. Para instalar
 el APK y guardar el plan HOME sin aplicarlo, utiliza `-PlanOnly`.
 

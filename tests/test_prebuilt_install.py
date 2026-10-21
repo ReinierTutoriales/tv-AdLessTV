@@ -60,6 +60,15 @@ exit 0
                     self.assertFalse(any('apply' in call or 'plan' in call for call in recorded))
                 else:
                     self.assertEqual(len(list((root / 'backups').glob('Restaurar-HOME-*.ps1'))), 2)
+            calls.unlink()
+            (root / 'app-debug.apk').unlink()
+            home_only = subprocess.run(command + ['-HomeOnly'], cwd=root,
+                                       env={**environment, 'FAIL_INSTALL': '1'}, capture_output=True, text=True)
+            self.assertEqual(home_only.returncode, 0, home_only.stderr)
+            recorded = [json.loads(s) for s in calls.read_text(encoding='utf-8-sig').splitlines()]
+            self.assertFalse(any('install' in call for call in recorded))
+            self.assertTrue(any('apply' in call for call in recorded))
+
 
 
 if __name__ == '__main__': unittest.main()
