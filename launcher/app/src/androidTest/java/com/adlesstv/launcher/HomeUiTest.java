@@ -67,6 +67,78 @@ public class HomeUiTest {
         }
     }
 
+    @Test public void homeResetsOnlyWhenAlreadyVisibleAndGlassSettlesAfterTheSlide() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        ActivityInfo info = context.getPackageManager().getActivityInfo(new ComponentName(context, MainActivity.class), 0);
+        List<AppRepository.App> fixtures = new ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            ResolveInfo resolve = new ResolveInfo();
+            resolve.activityInfo = info;
+            fixtures.add(new AppRepository.App(new ComponentName("com.adlesstv.home" + i, ".App"), "Inicio " + (i + 1), resolve));
+        }
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class));
+             FixedCatalog ignored = new FixedCatalog(scenario)) {
+            waitForCatalog(scenario);
+            scenario.onActivity(activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                ((AppAdapter) dock.getAdapter()).replace(fixtures.subList(0, 4), java.util.Collections.emptyList());
+                dock.setVisibility(View.VISIBLE);
+                ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.grid)).getAdapter())
+                        .replace(java.util.Collections.emptyList(), fixtures.subList(4, fixtures.size()));
+            });
+            waitUntil(scenario, activity -> {
+                RecyclerView.ViewHolder first = ((RecyclerView) activity.findViewById(R.id.dock)).findViewHolderForAdapterPosition(0);
+                return first != null && (first.itemView.isFocused() || first.itemView.requestFocus());
+            });
+            waitUntil(scenario, activity -> activity.hasWindowFocus());
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+            waitUntil(scenario, activity -> gridFocus(activity) == 1);
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT);
+            waitUntil(scenario, activity -> gridFocus(activity) == 2);
+            // Once the slide-up has ended, the highlight must sit on the focused tile.
+            waitUntil(scenario, activity -> {
+                View catalog = activity.findViewById(R.id.catalog_container);
+                View glass = activity.findViewById(R.id.glass);
+                View focus = activity.getCurrentFocus();
+                if (catalog.getTranslationY() != 0f || glass.getVisibility() != View.VISIBLE || focus == null) return false;
+                Rect tile = new Rect(), highlight = new Rect();
+                focus.getGlobalVisibleRect(tile);
+                glass.getGlobalVisibleRect(highlight);
+                return Math.abs(tile.centerY() - highlight.centerY()) <= AppAdapter.dp(activity, 3);
+            });
+            // Returning from another app with Home keeps the tile that was focused. onStop sets this
+            // flag; the test harness cannot resume a stopped singleTask HOME activity, so set it.
+            java.lang.reflect.Field left = MainActivity.class.getDeclaredField("leftHome");
+            left.setAccessible(true);
+            scenario.onActivity(activity -> {
+                try { left.setBoolean(activity, true); }
+                catch (IllegalAccessException error) { throw new AssertionError(error); }
+                activity.onHomePressed();
+            });
+            instrumentation.waitForIdleSync();
+            scenario.onActivity(activity -> assertEquals("Coming back from an app must keep the grid tile",
+                    2, gridFocus(activity)));
+            scenario.onActivity(activity -> {
+                try { left.setBoolean(activity, false); }
+                catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            // Home while Home is already visible goes back to the dock.
+            scenario.onActivity(MainActivity::onHomePressed);
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View focus = activity.getCurrentFocus();
+                return focus != null && dock.findContainingItemView(focus) != null;
+            });
+        }
+    }
+
+    private static int gridFocus(MainActivity activity) {
+        RecyclerView grid = activity.findViewById(R.id.grid);
+        View focus = activity.getCurrentFocus();
+        View tile = focus == null ? null : grid.findContainingItemView(focus);
+        return tile == null ? -1 : grid.getChildAdapterPosition(tile);
+    }
+
     @Test public void visualThemeIsLocalAndSurvivesActivityRecreation() {
         Context context = instrumentation.getTargetContext();
         AppRepository preferences = new AppRepository(context);

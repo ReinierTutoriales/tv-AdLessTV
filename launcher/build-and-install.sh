@@ -64,7 +64,19 @@ fi
 cleanup_staged_apk
 trap - EXIT
 result="${result//$'\r'/}"
-if [[ "$install_status" != 0 || ! "$result" =~ ^[[:space:]]*Success[[:space:]]*$ ]]; then
+# Success means the last non-blank line is exactly "Success" and no line reports Failure.
+# Android 6/7 `pm` prints "\tpkg: <path>" first, so the whole output is not always one line.
+install_succeeded() {
+  local line last='' failed=0
+  while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"; line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" ]] && continue
+    [[ "$line" == Failure* ]] && failed=1
+    last="$line"
+  done <<< "$1"
+  [[ "$failed" == 0 && "$last" == Success ]]
+}
+if [[ "$install_status" != 0 ]] || ! install_succeeded "$result"; then
   printf 'Instalación fallida: %s\n' "$result" >&2
   if [[ "$result" == *INSTALL_FAILED_UPDATE_INCOMPATIBLE* || "$result" == *signatures* ]]; then
     echo 'La versión instalada está firmada con otra clave. No se desinstala automáticamente:' >&2

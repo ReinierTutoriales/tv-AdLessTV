@@ -31,6 +31,7 @@ if 'getprop ro.build.version.sdk' in sys.argv:
 elif 'pm list features' in sys.argv:
  print('feature:android.software.leanback')
 elif 'pm install -r /data/local/tmp/adlesstv-preview.apk' in sys.argv:
+ if os.environ.get('LEGACY_PM'): print('\tpkg: /data/local/tmp/adlesstv-preview.apk')
  print('Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]' if os.environ.get('FAIL_INSTALL') else 'Success')
  if os.environ.get('MIXED_RESULT'): print('Failure [INSTALL_FAILED_ABORTED]')
 elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
@@ -51,6 +52,10 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
             crlf = subprocess.run(command, cwd=root, env={**environment, 'CRLF': '1'},
                                   capture_output=True, text=True)
             self.assertEqual(crlf.returncode, 0, crlf.stderr)
+            capture.unlink()
+            legacy = subprocess.run(command, cwd=root, env={**environment, 'LEGACY_PM': '1'},
+                                    capture_output=True, text=True)
+            self.assertEqual(legacy.returncode, 0, 'Android 6/7 prints a pkg line before Success: ' + legacy.stderr)
             capture.unlink()
             mixed = subprocess.run(command, cwd=root, env={**environment, 'MIXED_RESULT': '1'},
                                    capture_output=True, text=True)

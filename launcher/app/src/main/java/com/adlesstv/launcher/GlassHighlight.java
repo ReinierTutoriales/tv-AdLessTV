@@ -46,6 +46,13 @@ final class GlassHighlight implements ViewTreeObserver.OnGlobalFocusChangeListen
 
     boolean enabled() { return enabled; }
 
+    /** Re-measure after a container animation (e.g. the catalog sliding up) has settled. */
+    void refresh() {
+        if (!enabled) return;
+        if (target != null && glass.getVisibility() == View.VISIBLE) place(false);
+        else onGlobalFocusChanged(null, frame.findFocus());
+    }
+
     @Override public void onGlobalFocusChanged(View oldFocus, View newFocus) {
         if (!enabled) return;
         target = newFocus instanceof AppAdapter.Tile ? newFocus : null;

@@ -98,6 +98,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private final BroadcastReceiver userUnlocked = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             repository = new AppRepository(MainActivity.this);
+            // Before unlock only device-protected storage is readable; a theme in Android/data
+            // becomes visible now, so apply it instead of keeping the pre-unlock defaults.
+            config = repository.config();
+            applyBackdrop();
+            if (wallpaperBitmap == null) loadWallpaper();
+            applyGlass();
             dirty = true;
             if (resumed) refresh();
         }
@@ -126,6 +132,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private String lastFocused;
     private boolean resumed;
     private boolean started;
+    /** Set when another app covered Home; a HOME intent then means "come back", not "reset". */
+    private boolean leftHome;
     private boolean catalogReady;
     private boolean artworkReleased;
     private boolean dirty = true;
@@ -306,12 +314,16 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     @Override protected void onStop() {
         started = false;
+        leftHome = true;
         super.onStop();
     }
 
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
+        boolean returning = leftHome;
+        leftHome = false;
+        if (returning) main.post(glass::refresh);
         if (artworkReleased) {
             artworkReleased = false;
             adapter.notifyItemRangeChanged(0, adapter.getItemCount());
@@ -334,8 +346,16 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             return;
         }
         if (RemoteKeyService.ACTION_INPUTS.equals(intent.getAction())) main.post(this::showInputs);
+        // Home pressed while Home is already showing goes back to the dock. Coming back from an
+        // app keeps the tile that opened it focused. This relies on onStop having happened, not on
+        // the onStart/onNewIntent order, which differs between Android versions.
         else if (Intent.ACTION_MAIN.equals(intent.getAction()) && intent.hasCategory(Intent.CATEGORY_HOME))
-            returnToDock();
+            onHomePressed();
+    }
+
+    /** HOME intent delivered to the running launcher. */
+    void onHomePressed() {
+        if (!leftHome) returnToDock();
     }
 
     @Override public void onUserInteraction() {
@@ -577,7 +597,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (openingCatalog && !repository.reducedMotion()) {
             catalogContainer.setAlpha(0f);
             catalogContainer.setTranslationY(AppAdapter.dp(this, 24));
-            catalogContainer.animate().alpha(1f).translationY(0f).setDuration(200).start();
+            // The highlight is measured on focus, mid-slide: place it again once the grid settles.
+            catalogContainer.animate().alpha(1f).translationY(0f).setDuration(200)
+                    .withEndAction(glass::refresh).start();
         } else {
             catalogContainer.setAlpha(1f);
             catalogContainer.setTranslationY(0f);

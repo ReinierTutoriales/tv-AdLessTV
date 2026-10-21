@@ -39,7 +39,12 @@ try {
     try { & $Python $client '--host' $TvHost 'rm -f /data/local/tmp/adlesstv-preview.apk' | Out-Null }
     catch { Write-Warning 'No se pudo borrar el APK temporal de la TV; revisa /data/local/tmp cuando vuelva ADB.' }
 }
-if ($installCode -ne 0 -or ($result -join "`n").Trim() -cnotmatch '\ASuccess\z') {
+# Success means the last non-blank line is exactly "Success" and no line reports Failure.
+# Android 6/7 `pm` prints "`tpkg: <path>" first, so the whole output is not always one line.
+$installLines = @(($result -join "`n") -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$installOk = $installLines.Count -gt 0 -and $installLines[-1] -ceq 'Success' -and
+    -not ($installLines | Where-Object { $_ -clike 'Failure*' })
+if ($installCode -ne 0 -or -not $installOk) {
     if ($result -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE|signatures') {
         throw "Instalación fallida: $result`nLa versión instalada está firmada con otra clave. No se desinstala automáticamente: si AdLessTV es HOME, restaura primero el HOME anterior con tools/home.py --restore <respaldo>."
     }
