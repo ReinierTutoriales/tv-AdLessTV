@@ -342,6 +342,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void focusDock(int position) {
         catalogContainer.animate().cancel();
+        catalogContainer.setTranslationY(0f);
         catalogContainer.setAlpha(1f);
         catalogContainer.setVisibility(View.GONE);
         idleSpacer.setVisibility(View.VISIBLE);
@@ -374,9 +375,11 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         catalogContainer.setVisibility(View.VISIBLE);
         if (openingCatalog && !repository.reducedMotion()) {
             catalogContainer.setAlpha(0f);
-            catalogContainer.animate().alpha(1f).setDuration(180).start();
+            catalogContainer.setTranslationY(AppAdapter.dp(this, 24));
+            catalogContainer.animate().alpha(1f).translationY(0f).setDuration(200).start();
         } else {
             catalogContainer.setAlpha(1f);
+            catalogContainer.setTranslationY(0f);
         }
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
