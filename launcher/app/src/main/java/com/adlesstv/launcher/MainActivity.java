@@ -341,12 +341,15 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void focusGrid(int position) {
-        catalogContainer.setVisibility(View.VISIBLE);
         if (position < 0 || position >= adapter.getItemCount() || adapter.isHeading(position)) {
             if (dockAdapter.firstApp() >= 0) focusDock(dockAdapter.firstApp());
             else settings.requestFocus();
             return;
         }
+        // Reveal the catalog only when a valid app can receive focus.
+        // A newly visible RecyclerView may not have laid out its children yet;
+        // applyPendingFocus completes the handoff after layout.
+        catalogContainer.setVisibility(View.VISIBLE);
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
