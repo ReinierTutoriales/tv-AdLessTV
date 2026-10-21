@@ -7,18 +7,19 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ($ReplaceStock -and -not $HomeSnapshot) { throw '-ReplaceStock requiere -HomeSnapshot.' }
-if ($BuildOnly -and $HomeSnapshot) { throw '-BuildOnly no se combina con -HomeSnapshot.' }
+if ($BuildOnly -and ($HomeSnapshot -or $ReplaceStock)) { throw '-BuildOnly no se combina con -HomeSnapshot.' }
 $root = $PSScriptRoot
 & (Join-Path $root 'gradlew.bat') '-p' $root ':app:assembleDebug'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $apk = Join-Path $root 'app\build\outputs\apk\debug\app-debug.apk'
+if (-not (Test-Path -LiteralPath $apk -PathType Leaf) -or (Get-Item -LiteralPath $apk).Length -eq 0) { throw "El APK compilado no existe o está vacío: $apk" }
 if ($BuildOnly) { Write-Output "APK: $apk"; exit 0 }
 if (-not $TvHost) { throw 'Define TV_HOST con la IP de tu TV.' }
 $client = Join-Path $root '..\tools\tv.py'
-& $Python $client '--host' $TvHost '--push' $apk '/data/local/tmp/adlesstv-preview.apk'
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $installCode = 1
 try {
+    & $Python $client '--host' $TvHost '--push' $apk '/data/local/tmp/adlesstv-preview.apk'
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la transferencia del APK a la TV.' }
     $result = & $Python $client '--host' $TvHost 'pm install -r /data/local/tmp/adlesstv-preview.apk'
     $installCode = $LASTEXITCODE
 } finally {
