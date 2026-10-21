@@ -78,8 +78,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private View network;
     private View inputs;
     private View settings;
-    private View heroOpen;
-    private View heroInfo;
     private TextView heroName;
     private AppRepository.App selectedApp;
     private String lastFocused;
@@ -122,19 +120,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         inputs = findViewById(R.id.action_inputs);
         settings = findViewById(R.id.action_settings);
         network = findViewById(R.id.action_network);
-        heroOpen = findViewById(R.id.hero_open);
-        heroInfo = findViewById(R.id.hero_info);
         heroName = findViewById(R.id.hero_name);
         compact = getResources().getDisplayMetrics().heightPixels < AppAdapter.dp(this, 500);
         if (compact) {
             findViewById(R.id.date).setVisibility(View.GONE);
-            findViewById(R.id.hero_hint).setVisibility(View.GONE);
             heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 48);
         }
-        heroOpen.setOnClickListener(v -> { if (selectedApp != null) openApp(selectedApp); });
-        heroInfo.setOnClickListener(v -> { if (selectedApp != null) openAppDetails(selectedApp); });
-        heroOpen.setOnKeyListener((v, key, event) -> heroKey(key, event));
-        heroInfo.setOnKeyListener((v, key, event) -> heroKey(key, event));
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = () -> {
                 pendingGridPosition = RecyclerView.NO_POSITION;
@@ -202,7 +193,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                     if (libraryVisible) {
                         int selected = adapter.indexOf(lastFocused);
                         focusGrid(selected >= 0 ? selected : adapter.firstApp());
-                    } else if (heroOpen.isEnabled()) heroOpen.requestFocus();
+                    } else returnToShelf();
                     return true;
                 }
                 return false;
@@ -350,7 +341,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         dockAdapter.replace(pinned, Collections.emptyList());
         updateDockGeometry();
         dock.setVisibility(libraryVisible || pinned.isEmpty() ? View.GONE : View.VISIBLE);
-        findViewById(R.id.shelf_label).setVisibility(View.GONE);
         adapter.replace(Collections.emptyList(), rest);
         findViewById(R.id.library_hint).setVisibility(rest.isEmpty() ? View.GONE : View.VISIBLE);
         if (pinned.isEmpty()) showLibrary(true);
@@ -371,7 +361,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void focusDock(int position) {
         if (position < 0 || position >= dockAdapter.getItemCount()) {
-            heroOpen.requestFocus(); return;
+            firstTopAction().requestFocus(); return;
         }
         showLibrary(false);
         pendingGridPosition = RecyclerView.NO_POSITION;
@@ -440,7 +430,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private boolean navigateDock(int position, int key) {
-        if (key == KeyEvent.KEYCODE_DPAD_UP) { heroOpen.requestFocus(); return true; }
+        if (key == KeyEvent.KEYCODE_DPAD_UP) { firstTopAction().requestFocus(); return true; }
         if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (adapter.firstApp() >= 0) focusGrid(adapter.firstApp());
             return true;
@@ -638,8 +628,6 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void updateHero() {
         heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
-        heroOpen.setEnabled(selectedApp != null);
-        heroInfo.setEnabled(selectedApp != null);
         VisualTheme.applyAccent(this, repository.visualTheme(), findViewById(R.id.root),
                 selectedApp == null ? 0 : artwork.accent(selectedApp));
     }
@@ -656,39 +644,13 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         params.weight = show ? 0 : 1;
         hero.setLayoutParams(params);
         heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, show ? 26 : compact ? 44 : 56);
-        findViewById(R.id.hero_kicker).setVisibility(show ? View.GONE : View.VISIBLE);
-        findViewById(R.id.hero_hint).setVisibility(show || compact ? View.GONE : View.VISIBLE);
-        findViewById(R.id.hero_mark).setVisibility(View.GONE);
-        findViewById(R.id.shelf_label).setVisibility(View.GONE);
-        findViewById(R.id.hero_buttons).setVisibility(show ? View.GONE : View.VISIBLE);
-        LinearLayout.LayoutParams buttons = (LinearLayout.LayoutParams) findViewById(R.id.hero_buttons).getLayoutParams();
-        buttons.topMargin = AppAdapter.dp(this, show ? 8 : 18);
-        findViewById(R.id.hero_buttons).setLayoutParams(buttons);
+
     }
 
     private void returnToShelf() {
         int selected = dockAdapter.indexOf(lastDockFocused);
         if (dockAdapter.firstApp() >= 0) focusDock(selected >= 0 ? selected : dockAdapter.firstApp());
         else settings.requestFocus();
-    }
-
-    private boolean heroKey(int key, KeyEvent event) {
-        if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-        if (key == KeyEvent.KEYCODE_DPAD_UP) { firstTopAction().requestFocus(); return true; }
-        if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
-            int selected = dockAdapter.indexOf(lastFocused);
-            if (dockAdapter.firstApp() >= 0) focusDock(selected >= 0 ? selected : dockAdapter.firstApp());
-            else focusGrid(adapter.indexOf(lastFocused) >= 0 ? adapter.indexOf(lastFocused) : adapter.firstApp());
-            return true;
-        }
-        if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            boolean towardsInfo = key == KeyEvent.KEYCODE_DPAD_RIGHT;
-            if (getWindow().getDecorView().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL)
-                towardsInfo = !towardsInfo;
-            (towardsInfo ? heroInfo : heroOpen).requestFocus();
-            return true;
-        }
-        return false;
     }
 
     private void openAppDetails(AppRepository.App app) {

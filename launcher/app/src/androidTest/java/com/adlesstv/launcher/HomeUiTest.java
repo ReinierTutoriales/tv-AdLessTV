@@ -90,7 +90,6 @@ public class HomeUiTest {
                 String label = adapter.at(owner.getChildAdapterPosition(tile)).label;
                 assertEquals("The hero must describe the focused app", label,
                         ((android.widget.TextView) activity.findViewById(R.id.hero_name)).getText().toString());
-                assertTrue(activity.findViewById(R.id.hero_open).isEnabled());
             });
             screenshot("installed-apps.png");
             AtomicBoolean canOpenLibrary = new AtomicBoolean();
@@ -188,7 +187,9 @@ public class HomeUiTest {
                 return tile != null && dock.getChildAdapterPosition(tile) == 0;
             });
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
-            waitUntil(scenario, activity -> activity.getCurrentFocus() == activity.findViewById(R.id.hero_open));
+            waitUntil(scenario, activity -> activity.getCurrentFocus() == activity.findViewById(
+                    activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE
+                            ? R.id.action_inputs : R.id.action_network));
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
             waitUntil(scenario, activity -> {
                 RecyclerView dock = activity.findViewById(R.id.dock);
@@ -279,8 +280,11 @@ public class HomeUiTest {
         View focused = activity.getCurrentFocus();
         if (activity.findViewById(R.id.library).getVisibility() != View.VISIBLE) {
             assertTrue("Top shelf must have room for its title", activity.findViewById(R.id.hero).getHeight() > root.getHeight() / 4);
-            assertTrue("Clock pill must not stretch across the screen", activity.findViewById(R.id.clock_pill).getWidth() < root.getWidth() * 0.7f);
-            assertTrue("Hero actions must fit the stage", activity.findViewById(R.id.hero_buttons).getBottom() <= activity.findViewById(R.id.hero).getHeight());
+            assertTrue("Clock text must not stretch across the screen", activity.findViewById(R.id.clock).getWidth() < root.getWidth() * 0.6f);
+            Rect clock = new Rect(), actions = new Rect();
+            activity.findViewById(R.id.clock).getGlobalVisibleRect(clock);
+            activity.findViewById(R.id.actions).getGlobalVisibleRect(actions);
+            assertFalse("Clock and top actions must not overlap", Rect.intersects(clock, actions));
         } else {
             assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
             Rect viewport = new Rect();
