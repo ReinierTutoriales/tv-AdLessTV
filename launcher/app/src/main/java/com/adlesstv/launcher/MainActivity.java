@@ -71,6 +71,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private AppAdapter dockAdapter;
     private ArtworkLoader artwork;
     private RecyclerView grid;
+    private View catalogContainer;
     private RecyclerView dock;
     private GridLayoutManager layout;
     private TextView empty;
@@ -110,6 +111,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             if (selectedApp != null && selectedApp.key().equals(app.key())) updateHero();
         });
         grid = findViewById(R.id.grid);
+        catalogContainer = findViewById(R.id.catalog_container);
         dock = findViewById(R.id.dock);
         empty = findViewById(R.id.empty);
         inputs = findViewById(R.id.action_inputs);
@@ -326,6 +328,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void focusDock(int position) {
+        catalogContainer.setVisibility(View.GONE);
         if (position < 0 || position >= dockAdapter.getItemCount()) {
             heroOpen.requestFocus(); return;
         }
@@ -338,6 +341,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void focusGrid(int position) {
+        catalogContainer.setVisibility(View.VISIBLE);
         if (position < 0 || position >= adapter.getItemCount() || adapter.isHeading(position)) {
             if (dockAdapter.firstApp() >= 0) focusDock(dockAdapter.firstApp());
             else settings.requestFocus();
