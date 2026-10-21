@@ -160,6 +160,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         holder.tile.animate().cancel();
         holder.tile.setScaleX(holder.tile.isFocused() ? 1.035f : 1f);
         holder.tile.setScaleY(holder.tile.isFocused() ? 1.035f : 1f);
+        holder.tile.setTranslationZ(holder.tile.isFocused() ? dp(context, 8) : 0f);
         holder.tile.setOnFocusChangeListener((v, focused) -> {
             animateFocus(v, focused, reducedMotion);
             if (focused) listener.focused(app);
@@ -181,6 +182,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             tile.animate().cancel();
             tile.setScaleX(1f);
             tile.setScaleY(1f);
+            tile.setTranslationZ(0f);
         }
         super.onViewRecycled(holder);
     }
@@ -191,10 +193,15 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     static void animateFocus(View view, boolean focused, boolean reducedMotion) {
         view.animate().cancel();
         float scale = focused ? 1.035f : 1f;
+        float elevation = focused ? dp(view.getContext(), 8) : 0f;
         if (reducedMotion) {
             view.setScaleX(1f);
             view.setScaleY(1f);
-        } else view.animate().scaleX(scale).scaleY(scale).setDuration(120).start();
+            view.setTranslationZ(elevation);
+        } else {
+            view.animate().scaleX(scale).scaleY(scale).translationZ(elevation)
+                    .setDuration(150).start();
+        }
     }
 
     /** Artwork ratio follows the measured span width; no minimum width can overflow a column. */
