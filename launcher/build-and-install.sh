@@ -18,15 +18,21 @@ done
 if [[ -n "$STOCK_PACKAGE" && -z "$HOME_SNAPSHOT" ]]; then
   echo '--replace-stock requiere --make-home con un respaldo nuevo.' >&2; exit 2
 fi
-if [[ "$BUILD_ONLY" == 1 && -n "$HOME_SNAPSHOT" ]]; then
+if [[ "$BUILD_ONLY" == 1 && ( -n "$HOME_SNAPSHOT" || -n "$STOCK_PACKAGE" ) ]]; then
   echo '--build-only no se combina con --make-home.' >&2; exit 2
 fi
 "$ROOT/gradlew" -p "$ROOT" :app:assembleDebug
 APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+[[ -s "$APK" ]] || { echo "El APK compilado no existe o está vacío: $APK" >&2; exit 1; }
 if [[ "$BUILD_ONLY" == 1 ]]; then printf 'APK: %s\n' "$APK"; exit 0; fi
 : "${TV_HOST:?Define TV_HOST con la IP de tu TV}"
 PY="${PYTHON:-python3}"
 export MSYS_NO_PATHCONV=1
+cleanup_staged_apk() {
+  "$PY" "$ROOT/../tools/tv.py" 'rm -f /data/local/tmp/adlesstv-preview.apk' >/dev/null 2>&1 || true
+}
+# Cleanup also runs if transfer or installation fails.
+trap cleanup_staged_apk EXIT
 "$PY" "$ROOT/../tools/tv.py" --push "$APK" /data/local/tmp/adlesstv-preview.apk
 if result="$("$PY" "$ROOT/../tools/tv.py" 'pm install -r /data/local/tmp/adlesstv-preview.apk')"; then
   install_status=0
@@ -34,7 +40,8 @@ else
   install_status=$?
 fi
 # The APK is staged in /data/local/tmp; keep no extra copy on an 8 GB stick.
-"$PY" "$ROOT/../tools/tv.py" 'rm -f /data/local/tmp/adlesstv-preview.apk' >/dev/null || true
+cleanup_staged_apk
+trap - EXIT
 if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
   printf 'Instalación fallida: %s\n' "$result" >&2; exit 1
 fi
