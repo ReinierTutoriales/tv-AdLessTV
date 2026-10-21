@@ -325,6 +325,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         if (noApps) {
             catalogContainer.animate().cancel();
             catalogContainer.setAlpha(1f);
+            catalogContainer.setTranslationY(0f);
             idleSpacer.setVisibility(View.GONE);
             catalogContainer.setVisibility(View.VISIBLE);
             settings.requestFocus();
@@ -346,8 +347,11 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         catalogContainer.setAlpha(1f);
         catalogContainer.setVisibility(View.GONE);
         idleSpacer.setVisibility(View.VISIBLE);
+        pendingGridPosition = RecyclerView.NO_POSITION;
         if (position < 0 || position >= dockAdapter.getItemCount()) {
-            heroOpen.requestFocus(); return;
+            pendingDockPosition = RecyclerView.NO_POSITION;
+            if (!heroOpen.requestFocus()) settings.requestFocus();
+            return;
         }
         pendingGridPosition = RecyclerView.NO_POSITION;
         pendingDockPosition = position;
@@ -362,6 +366,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void focusGrid(int position) {
         if (position < 0 || position >= adapter.getItemCount() || adapter.isHeading(position)) {
+            pendingGridPosition = RecyclerView.NO_POSITION;
             if (dockAdapter.firstApp() >= 0) focusDock(dockAdapter.firstApp());
             else settings.requestFocus();
             return;
