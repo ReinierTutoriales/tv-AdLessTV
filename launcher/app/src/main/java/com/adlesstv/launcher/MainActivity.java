@@ -335,7 +335,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         pendingGridPosition = RecyclerView.NO_POSITION;
         pendingDockPosition = position;
         RecyclerView.ViewHolder holder = dock.findViewHolderForAdapterPosition(position);
-        if (holder != null && holder.itemView.requestFocus()) return;
+        if (holder != null && holder.itemView.requestFocus()) {
+            pendingDockPosition = RecyclerView.NO_POSITION;
+            return;
+        }
         dock.scrollToPosition(position);
         dock.post(this::applyPendingFocus);
     }
@@ -353,7 +356,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         pendingDockPosition = RecyclerView.NO_POSITION;
         pendingGridPosition = position;
         RecyclerView.ViewHolder holder = grid.findViewHolderForAdapterPosition(position);
-        if (holder != null && holder.itemView.requestFocus()) return;
+        if (holder != null && holder.itemView.requestFocus()) {
+            pendingGridPosition = RecyclerView.NO_POSITION;
+            return;
+        }
         grid.scrollToPosition(position == adapter.firstApp() ? 0 : position);
         grid.post(this::applyPendingFocus);
     }
