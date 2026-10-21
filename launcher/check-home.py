@@ -8,6 +8,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import home
+import home_setup
 
 
 def adb(*arguments, timeout=120):
@@ -84,6 +85,20 @@ def main():
             except Exception as error: print(f'Diagnostic {label}: {error}', file=sys.stderr)
         if snapshot.exists(): home.restore(device, snapshot)
     print('HOME persisted through two reboots and the original launcher was restored.')
+    if home.current_home(device).split('/', 1)[0] in home_setup.STOCK:
+        full_snapshot = output / 'home-complete.json'
+        try:
+            candidate = home_setup.plan(device)
+            home_setup.save_new(output / 'home-complete-plan.json', candidate)
+            home_setup.apply(device, candidate, full_snapshot)
+            reboot()
+            wait_for_home(device)
+            home_setup.verify(device, full_snapshot)
+        finally:
+            if full_snapshot.exists(): home_setup.restore(device, full_snapshot)
+        print('Complete HOME plan applied, persisted through reboot and restored.')
+    else:
+        print('Complete Google TV HOME plan skipped: this emulator uses an unsupported phone launcher.')
 
 
 if __name__ == '__main__':

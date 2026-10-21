@@ -14,9 +14,23 @@ La restauración verifica la identidad y recupera únicamente los paquetes inten
 
 ## Lanzador implementado
 
-Proyecto Java para Android TV (API 23+) con compilación y objetivo Android 16 (API 36), AGP 9.4.1 y AndroidX RecyclerView. Android 17 (API 37) ya se publicó, pero el `sdkmanager` usado por la CI no ofrece `platforms;android-37` en su canal actual (fallo reproducido en la ejecución 38). Antes de elevar el objetivo API hay que disponer del SDK y probar los cambios de comportamiento de Android 17, incluidos red local y redimensionamiento en pantallas grandes. La CI comprueba Android 15 y Android TV 14; la persistencia en firmware de TV reciente todavía requiere validación física. `AppRepository` descubre actividades instaladas y conserva favoritos ordenados y paquetes ocultos mediante preferencias locales. Las apps se consultan en un ejecutor al entrar por primera vez o al recibir cambios de paquetes; volver de una app conserva las vistas y el foco. Se muestra una entrada por paquete, priorizando actividades TV. `ArtworkLoader` carga banners e iconos en dos workers y produce imágenes de 256 × 144; su caché de bitmaps tiene un límite de 4 MiB (2 MiB en dispositivos low-RAM), sin almacenamiento en disco ni red. Cancela peticiones de vistas recicladas e invalida la caché al cambiar paquetes. No solicita permisos de red, identificación ni localización, ni incorpora SDK de analítica. El acceso directo a Wi-Fi abre los ajustes sin observar la conexión.
+Proyecto Java para Android TV (API 23+) con compilación y objetivo Android 16 (API 36), AGP 9.4.1 y AndroidX RecyclerView. Android 17 (API 37) ya se publicó, pero el `sdkmanager` usado por la CI no ofrece `platforms;android-37` en su canal actual (fallo reproducido en la ejecución 38). Antes de elevar el objetivo API hay que disponer del SDK y probar los cambios de comportamiento de Android 17, incluidos red local y redimensionamiento en pantallas grandes. La CI comprueba Android 15 y Android TV 14; la persistencia en firmware de TV reciente todavía requiere validación física. `AppRepository` descubre actividades instaladas y conserva favoritos ordenados y paquetes ocultos mediante preferencias locales. Las apps se consultan en un ejecutor al entrar por primera vez o al recibir cambios de paquetes; volver de una app conserva las vistas y el foco. Se muestra una entrada por paquete, priorizando actividades TV. `ArtworkLoader` carga banners/iconos locales en dos workers y produce imágenes opacas de 256 × 144; su caché de bitmaps tiene un límite de 4 MiB (2 MiB en dispositivos low-RAM), sin almacenamiento en disco ni red. Cancela peticiones de vistas recicladas e invalida la caché al cambiar paquetes. No solicita permisos de red, identificación ni localización, ni incorpora SDK de analítica. El acceso directo a Wi-Fi abre los ajustes sin observar la conexión.
 
-`MainActivity` usa una cabecera compacta, una fila horizontal de favoritos y una cuadrícula desplazable para el resto de aplicaciones. Los dos RecyclerView reciclan tarjetas e imágenes; el dock se oculta si no hay favoritos. El reloj ocupa solo su contenido; la ayuda para organizar aplicaciones está junto al título seleccionado. La cabecera crece con la escala de fuente. Las cabeceras de sección ocupan una fila completa; las tarjetas se miden dentro de cada columna y mantienen la proporción del arte. El número de columnas varía de 2 a 6 según el ancho. El recorrido D-pad cruza héroe, dock y cuadrícula, salta cabeceras y ajusta la columna al bajar a una fila incompleta; el foco tiene borde visible y una escala breve. La interfaz usa superficies opacas, sin desenfoque ni vídeo de fondo. La app enfocada se recuerda por componente, se recupera tras volver y se revalida al cambiar las apps instaladas. Mantener OK permite fijar, ordenar, esconder o abrir información de la app; el menú de ajustes restaura paquetes ocultos, confirma el restablecimiento de favoritos y permite solicitar el rol HOME cuando el firmware lo ofrece. Los botones también responden al clic. Márgenes laterales de 48 dp y verticales de 27 dp corresponden al área segura de referencia de 960 × 540 en las guías de TV; no se añade una dependencia de UI que incremente el coste de arranque.
+`MainActivity` separa portada y biblioteca. La portada muestra reloj/fecha y accesos
+con icono y texto; el nombre de la app seleccionada se sitúa inmediatamente sobre
+el dock centrado. OK abre una app, OK prolongado abre su organización/información,
+Abajo abre la biblioteca y Atrás o HOME recuperan la selección del dock. No hay
+acciones redundantes en la cabecera. La biblioteca utiliza un título compacto y
+el espacio restante para las apps, con columnas adaptativas y navegación por D-pad.
+Los márgenes laterales/verticales son 48/27 dp. Se revisan tamaños 960 × 540 y
+720 × 480 con texto ampliado 1,3.
+
+Las tarjetas utilizan banners locales 16:9 cuando el APK de la app los declara;
+los banners cuadrados recurren al icono centrado. El nombre se muestra fuera de
+la imagen. Se renderiza en workers a 256 × 144 RGB_565 y se comparte la petición
+por componente/generación. El fondo ambiental es un gradiente nativo, sin una
+imagen a pantalla completa ni desenfoque. El detalle actualizado de consumo,
+correcciones y funciones pendientes está en [REVISION_OPERATIVA.md](REVISION_OPERATIVA.md).
 
 Las entradas se enumeran mediante `TvInputManager`; Android o el fabricante pueden no proporcionar una actividad que abra una entrada. Se notifica el fallo y se ofrecen los ajustes. `ClockDream` es un salvapantallas opcional con reloj que cambia de posición mientras está activo.
 
@@ -29,7 +43,11 @@ El catálogo inicial de informes y analítica incluye paquetes adicionales de va
 
 Antes de desactivar un paquete de provisión Wi-Fi conocido, tanto debloat como sustitución opcional de HOME examinan localmente `dumpsys wifi` para detectar si es creador de alguna red guardada. La sustitución comprueba antes del primer cambio y otra vez antes de desactivar. Si hay dependencia o no se puede leer el informe, cancela; no almacena SSIDs ni el informe. Este chequeo acotado no certifica la seguridad de desactivar otros paquetes que un fabricante haya acoplado a la red. Si ADB depende de Wi-Fi, conviene comprobar reconexión y recuperación antes de aplicar el perfil.
 
-El menú del lanzador permite reducir el movimiento de las tarjetas conservando el borde de foco. Se guarda solo en preferencias del dispositivo. Ofrece tres paletas opacas aplicadas a la cabecera, el dock y el fondo mediante colores y drawables creados al elegir un tema; reutiliza un color extraído del arte local ya cargado para teñir suavemente la cabecera, sin trabajo periódico ni otra caché de imágenes. Las imágenes renderizadas son opacas RGB_565 y se descartan los trabajos de una generación anterior cuando cambian los paquetes; queda pendiente medir la mejora real en hardware con poca RAM.
+El menú permite reducir el movimiento manteniendo el borde de foco, y elegir
+entre tres fondos con acento del arte local. Cada bitmap final RGB_565 ocupa
+73 728 bytes. La caché está limitada a 2/4 MiB; ese límite no es la memoria total
+del proceso ni del renderizador. Se cancelan solicitudes de vistas recicladas y
+de generaciones anteriores. Falta medir el comportamiento en el onn físico.
 
 La UI comprueba la actividad que resuelve el intent HOME antes de decir que AdLessTV es el inicio efectivo: poseer `ROLE_HOME` puede no bastar en determinadas imágenes de TV. La activación normal por ADB restaura el rol anterior si otro HOME sigue resolviéndose; solo la operación opcional con paquete exacto puede desactivar el anterior, con respaldo y restauración. La espera de 12 segundos cubre la demora de 10 segundos observada en AOSP, pero no ofrece una garantía contractual para todos los fabricantes.
 
@@ -63,3 +81,12 @@ Publicar el perfil de ese modelo solo con resultados observados y límites de la
 Las herramientas tienen regresiones en Linux y Windows. Pendiente: conexión, lectura de estados, aplicación y restauración sobre firmware real. Para el lanzador: la CI compila debug y release, ejecuta Android Lint y comprueba que ninguno de los APK solicite permisos fuera del interno para proteger receptores dinámicos; la tarea de emulador prueba tamaños 960 × 540 y 720 × 480 con fuente ampliada, nombres largos, cambios de sección y visibilidad del foco. Guarda capturas de apps instaladas y de un catálogo artificial de prueba. Faltan pruebas en TV física, mediciones comparables de arranque/memoria y validación de entradas por fabricante.
 
 El Activity HOME es `singleTask` y Direct-Boot aware. Desde API 24, sus preferencias locales se guardan en almacenamiento protegido del dispositivo y migran las elecciones anteriores después de desbloquear. No usa un servicio permanente ni un receptor de arranque que intente eludir las restricciones de actividades en segundo plano. La CI de emulador selecciona HOME, reinicia, comprueba que aparece solo, desactiva el HOME anterior, repite el reinicio y restaura. Un firmware de TV que imponga otra actividad al arrancar requiere validación específica.
+
+
+## Revisión 0.3.0-preview.2
+
+La [revisión operativa](REVISION_OPERATIVA.md) sustituye las descripciones visuales
+de preview.1: las tarjetas usan banners locales 16:9 de 256 × 144 RGB_565, el dock
+se centra en una banda ajustada y se elimina el icono decorativo de la cabecera.
+El nombre se sitúa fuera del arte. La carga se comparte por componente y
+generación. HOME cierra la biblioteca y conserva la selección del dock.

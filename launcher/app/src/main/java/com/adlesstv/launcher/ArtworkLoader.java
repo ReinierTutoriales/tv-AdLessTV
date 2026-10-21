@@ -13,7 +13,9 @@ import android.util.LruCache;
 import android.widget.ImageView;
 
 import java.util.IdentityHashMap;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +26,7 @@ final class ArtworkLoader {
     private static final int WIDTH = 256;
     private static final int HEIGHT = 144;
     interface Listener { void loaded(AppRepository.App app); }
+    interface AccentTarget { void loaded(int color); }
 
     private static final class Artwork {
         final Bitmap bitmap;
@@ -33,16 +36,25 @@ final class ArtworkLoader {
 
     private final Context context;
     private final Listener listener;
-    private final ThreadPoolExecutor workers = new ThreadPoolExecutor(2, 2, 0L,
+    private final ThreadPoolExecutor workers = new ThreadPoolExecutor(2, 2, 15L,
             TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Map<ImageView, Future<?>> requests = new IdentityHashMap<>();
+    private static final class Load {
+        final Map<ImageView, AccentTarget> targets = new IdentityHashMap<>();
+        Future<?> future;
+    }
+    // These maps are owned by the main thread. Dock and library share a load per component.
+    // Track completed/cache-hit bindings without keeping recycled views alive.
+    private final Map<ImageView, Boolean> bindings = new WeakHashMap<>();
+    private final Map<ImageView, Load> requests = new IdentityHashMap<>();
+    private final Map<String, Load> loads = new HashMap<>();
     private final LruCache<String, Artwork> cache;
     private volatile boolean closed;
     private volatile int revision;
 
     ArtworkLoader(Context context, Listener listener) {
         this.context = context.getApplicationContext();
+        workers.allowCoreThreadTimeOut(true);
         this.listener = listener;
         ActivityManager memory = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         int bytes = memory != null && memory.isLowRamDevice() ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
@@ -51,28 +63,45 @@ final class ArtworkLoader {
         };
     }
 
-    void bind(ImageView view, AppRepository.App app) {
+    void bind(ImageView view, AppRepository.App app, AccentTarget target) {
         cancel(view);
+        bindings.put(view, Boolean.TRUE);
         final int generation = revision;
         final String key = app.key() + ":" + generation;
         view.setTag(key);
         Artwork ready = cache.get(key);
         view.setImageBitmap(ready == null ? null : ready.bitmap);
+        target.loaded(ready == null ? 0 : ready.accent);
         if (ready != null || closed) return;
-        Future<?> request = workers.submit(() -> {
+        Load loading = loads.get(key);
+        if (loading != null) {
+            loading.targets.put(view, target);
+            requests.put(view, loading);
+            return;
+        }
+        Load load = new Load();
+        load.targets.put(view, target);
+        loads.put(key, load);
+        requests.put(view, load);
+        load.future = workers.submit(() -> {
             if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
             Artwork result = new Artwork(render(app));
             if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
             main.post(() -> {
-                if (!closed && revision == generation && key.equals(view.getTag())) {
-                    cache.put(key, result);
-                    view.setImageBitmap(result.bitmap);
-                    requests.remove(view);
-                    listener.loaded(app);
+                if (closed || revision != generation || loads.get(key) != load) return;
+                loads.remove(key);
+                cache.put(key, result);
+                for (Map.Entry<ImageView, AccentTarget> binding : load.targets.entrySet()) {
+                    ImageView image = binding.getKey();
+                    if (requests.get(image) != load || !key.equals(image.getTag())) continue;
+                    requests.remove(image);
+                    image.setImageBitmap(result.bitmap);
+                    binding.getValue().loaded(result.accent);
                 }
+                load.targets.clear();
+                listener.loaded(app);
             });
         });
-        requests.put(view, request);
     }
 
     int accent(AppRepository.App app) {
@@ -80,15 +109,21 @@ final class ArtworkLoader {
         return ready == null ? 0 : ready.accent;
     }
 
+    Bitmap bitmap(AppRepository.App app) {
+        Artwork ready = cache.get(app.key() + ":" + revision);
+        return ready == null ? null : ready.bitmap;
+    }
+
     private static int sampleAccent(Bitmap bitmap) {
         int accent = 0, best = 0;
-        for (int y = 15; y < bitmap.getHeight() - 15; y += 18) {
-            for (int x = 16; x < bitmap.getWidth() - 16; x += 20) {
+        for (int y = 8; y < bitmap.getHeight() - 8; y += 8) {
+            for (int x = 8; x < bitmap.getWidth() - 8; x += 8) {
                 int pixel = bitmap.getPixel(x, y);
+                if (Color.alpha(pixel) < 200) continue;
                 int r = Color.red(pixel), g = Color.green(pixel), b = Color.blue(pixel);
                 int high = Math.max(r, Math.max(g, b)), low = Math.min(r, Math.min(g, b));
                 int score = high - low;
-                if (high < 70 || high > 225 || score < 35 || score <= best) continue;
+                if (high < 70 || score < 35 || score <= best) continue;
                 best = score;
                 accent = Color.rgb(r, g, b);
             }
@@ -97,20 +132,29 @@ final class ArtworkLoader {
     }
 
     private Bitmap render(AppRepository.App app) {
-        // Every pixel is painted opaque; 565 halves the backing memory on small sticks.
+        // Android TV supplies 16:9 artwork in the installed APK. Prefer it over a phone icon.
+        // The output is opaque: RGB_565 is sufficient and costs 72 KiB per card.
         Bitmap bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.RGB_565);
         Canvas canvas = new Canvas(bitmap);
-        canvas.drawColor(Color.rgb(28, 32, 40));
+        canvas.drawColor(0xFF161B25);
         Drawable art = null;
         boolean banner = false;
         try {
             art = app.info.activityInfo.loadBanner(context.getPackageManager());
-            banner = art != null;
-            if (art == null) art = app.info.loadIcon(context.getPackageManager());
-        } catch (RuntimeException ignored) { /* Package may have been removed during this request. */ }
+            if (art == null) art = app.info.activityInfo.applicationInfo.loadBanner(context.getPackageManager());
+            if (art != null) {
+                float ratio = (float) art.getIntrinsicWidth() / Math.max(1, art.getIntrinsicHeight());
+                // Malformed/square vendor banners should use the icon fallback, never be stretched.
+                banner = ratio >= 1.45f && ratio <= 2.1f;
+            }
+            if (!banner) art = app.info.loadIcon(context.getPackageManager());
+        } catch (RuntimeException ignored) { /* Package may have changed during this request. */ }
         if (art == null) art = context.getPackageManager().getDefaultActivityIcon();
+        Drawable.ConstantState constant = art.getConstantState();
+        if (constant != null) art = constant.newDrawable(context.getResources()).mutate();
         int width = Math.max(1, art.getIntrinsicWidth()), height = Math.max(1, art.getIntrinsicHeight());
-        float scale = Math.min((banner ? WIDTH : 100f) / width, (banner ? HEIGHT : 100f) / height);
+        float scale = banner ? Math.min((float) WIDTH / width, (float) HEIGHT / height)
+                : Math.min(76f / width, 76f / height);
         int w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
         Rect old = new Rect(art.getBounds());
         art.setBounds((WIDTH - w) / 2, (HEIGHT - h) / 2, (WIDTH + w) / 2, (HEIGHT + h) / 2);
@@ -120,10 +164,15 @@ final class ArtworkLoader {
     }
 
     void cancel(ImageView view) {
-        Future<?> previous = requests.remove(view);
+        bindings.remove(view);
+        Load previous = requests.remove(view);
         if (previous != null) {
-            previous.cancel(true);
-            workers.remove((Runnable) previous);
+            previous.targets.remove(view);
+            if (previous.targets.isEmpty()) {
+                loads.values().remove(previous);
+                previous.future.cancel(true);
+                workers.remove((Runnable) previous.future);
+            }
         }
         view.setTag(null);
     }
@@ -136,10 +185,22 @@ final class ArtworkLoader {
     }
     void trim() { cache.evictAll(); }
 
+    void release() {
+        // RecyclerView can drop a holder without dispatching onViewRecycled after
+        // setAdapter(null). Clear every live binding before detaching its owners.
+        for (ImageView view : new java.util.ArrayList<>(bindings.keySet())) {
+            view.setImageDrawable(null);
+            view.setTag(null);
+        }
+        bindings.clear();
+        invalidate();
+    }
+
     void close() {
         closed = true;
-        for (Future<?> request : requests.values()) request.cancel(true);
-        requests.clear();
+        release();
+        for (ImageView view : new java.util.ArrayList<>(requests.keySet())) cancel(view);
+        loads.clear();
         workers.shutdownNow();
         main.removeCallbacksAndMessages(null);
         cache.evictAll();

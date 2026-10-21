@@ -45,12 +45,12 @@ public class HomeUiTest {
             try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(
                     new Intent(context, MainActivity.class))) {
                 scenario.onActivity(activity -> assertEquals(0xFF0A1018,
-                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
-                                .getBackground()).getColor()));
+                        ((android.graphics.drawable.ColorDrawable) ((android.graphics.drawable.LayerDrawable)
+                                activity.findViewById(R.id.root).getBackground()).getDrawable(0)).getColor()));
                 scenario.recreate();
                 scenario.onActivity(activity -> assertEquals(0xFF0A1018,
-                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
-                                .getBackground()).getColor()));
+                        ((android.graphics.drawable.ColorDrawable) ((android.graphics.drawable.LayerDrawable)
+                                activity.findViewById(R.id.root).getBackground()).getDrawable(0)).getColor()));
             }
         } finally {
             preferences.setVisualTheme(previous);
@@ -90,9 +90,24 @@ public class HomeUiTest {
                 String label = adapter.at(owner.getChildAdapterPosition(tile)).label;
                 assertEquals("The hero must describe the focused app", label,
                         ((android.widget.TextView) activity.findViewById(R.id.hero_name)).getText().toString());
-                assertTrue(activity.findViewById(R.id.hero_open).isEnabled());
             });
             screenshot("installed-apps.png");
+            AtomicBoolean canOpenLibrary = new AtomicBoolean();
+            scenario.onActivity(activity -> canOpenLibrary.set(
+                    ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.dock)).getAdapter()).firstApp() >= 0
+                    && ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.grid)).getAdapter()).firstApp() >= 0));
+            if (canOpenLibrary.get()) {
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+                waitUntil(scenario, activity -> ((RecyclerView) activity.findViewById(R.id.grid))
+                        .findContainingItemView(activity.getCurrentFocus()) != null);
+                scenario.onActivity(this::checkViewport);
+                screenshot("installed-library.png");
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+                waitUntil(scenario, activity -> activity.findViewById(R.id.library).getVisibility() == View.GONE
+                        && ((RecyclerView) activity.findViewById(R.id.dock))
+                        .findContainingItemView(activity.getCurrentFocus()) != null);
+                scenario.onActivity(this::checkViewport);
+            }
         }
     }
 
@@ -116,6 +131,7 @@ public class HomeUiTest {
                 ((AppAdapter) dock.getAdapter()).replace(fixtures.subList(0, 6), java.util.Collections.emptyList());
                 dock.setVisibility(View.VISIBLE);
                 adapter.replace(java.util.Collections.emptyList(), fixtures.subList(6, fixtures.size()));
+                activity.showLibrary(true);
                 grid.scrollToPosition(1);
             });
             waitUntil(scenario, activity -> {
@@ -171,7 +187,9 @@ public class HomeUiTest {
                 return tile != null && dock.getChildAdapterPosition(tile) == 0;
             });
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
-            waitUntil(scenario, activity -> activity.getCurrentFocus() == activity.findViewById(R.id.hero_open));
+            waitUntil(scenario, activity -> activity.getCurrentFocus() == activity.findViewById(
+                    activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE
+                            ? R.id.action_inputs : R.id.action_network));
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
             waitUntil(scenario, activity -> {
                 RecyclerView dock = activity.findViewById(R.id.dock);
@@ -189,6 +207,99 @@ public class HomeUiTest {
                     context.getString(R.string.app_details)).isEmpty());
             screenshot("fixture-app-menu.png");
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+        }
+    }
+
+    @Test public void homeIntentReturnsToThePreviouslyFocusedDockApp() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        Intent homeIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .setComponent(new ComponentName(context, MainActivity.class));
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(homeIntent)) {
+            waitForCatalog(scenario);
+            AtomicInteger dockPosition = new AtomicInteger();
+            scenario.onActivity(activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                if (dock.getAdapter().getItemCount() < 2) return;
+                RecyclerView.ViewHolder holder = dock.findViewHolderForAdapterPosition(1);
+                if (holder != null && holder.itemView.requestFocus()) dockPosition.set(1);
+            });
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+            // ActivityScenario adds CLEAR_TASK to its launch Intent. Do not copy that test-only
+            // flag into the second HOME delivery: it would destroy the very instance under test.
+            context.startActivity(new Intent(homeIntent).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View tile = dock.findContainingItemView(activity.getCurrentFocus());
+                return activity.findViewById(R.id.library).getVisibility() == View.GONE
+                        && tile != null && dock.getChildAdapterPosition(tile) == dockPosition.get();
+            });
+            scenario.onActivity(this::checkViewport);
+            screenshot("home-return.png");
+        }
+    }
+
+    @Test public void packageRefreshKeepsTopActionFocusAndSkipsReplacementRemoval() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            java.lang.reflect.Field receiver = MainActivity.class.getDeclaredField("packageChanges");
+            java.lang.reflect.Field artwork = MainActivity.class.getDeclaredField("artwork");
+            java.lang.reflect.Field scanning = MainActivity.class.getDeclaredField("scanning");
+            receiver.setAccessible(true); artwork.setAccessible(true); scanning.setAccessible(true);
+            scenario.onActivity(activity -> {
+                try {
+                    activity.findViewById(R.id.action_network).requestFocus();
+                    ArtworkLoader loader = (ArtworkLoader) artwork.get(activity);
+                    int before = loader.revision();
+                    android.content.BroadcastReceiver changes = (android.content.BroadcastReceiver) receiver.get(activity);
+                    changes.onReceive(activity, new Intent(Intent.ACTION_PACKAGE_REMOVED)
+                            .putExtra(Intent.EXTRA_REPLACING, true));
+                    assertEquals("An update must not remove the old tile temporarily", before, loader.revision());
+                    changes.onReceive(activity, new Intent(Intent.ACTION_PACKAGE_REPLACED));
+                    assertTrue("The updated APK needs fresh artwork", loader.revision() > before);
+                } catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            waitUntil(scenario, activity -> {
+                try { return !scanning.getBoolean(activity); }
+                catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            scenario.onActivity(activity -> assertSame("A package update must not steal top action focus",
+                    activity.findViewById(R.id.action_network), activity.getCurrentFocus()));
+        }
+    }
+
+    @Test public void memoryPressureReleasesHiddenTilesAndRestoresTheirFocus() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            waitUntil(scenario, activity -> ((RecyclerView) activity.findViewById(R.id.dock))
+                    .findContainingItemView(activity.getCurrentFocus()) != null);
+            java.util.concurrent.atomic.AtomicReference<String> focused = new java.util.concurrent.atomic.AtomicReference<>();
+            java.util.concurrent.atomic.AtomicReference<AppAdapter.Tile> tile = new java.util.concurrent.atomic.AtomicReference<>();
+            scenario.onActivity(activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                tile.set((AppAdapter.Tile) dock.findContainingItemView(activity.getCurrentFocus()));
+                focused.set(((AppAdapter) dock.getAdapter()).at(dock.getChildAdapterPosition(tile.get())).key());
+                activity.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL);
+                assertNotNull("Visible Home must not lose its adapter", dock.getAdapter());
+            });
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED);
+            scenario.onActivity(activity -> {
+                activity.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
+                assertNotNull("An ordinary app return retains the tiles", ((RecyclerView) activity.findViewById(R.id.dock)).getAdapter());
+                activity.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
+                assertNull(((RecyclerView) activity.findViewById(R.id.grid)).getAdapter());
+                assertNull(((RecyclerView) activity.findViewById(R.id.dock)).getAdapter());
+                assertNull("Recycled tiles must release their bitmap", tile.get().icon.getDrawable());
+            });
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED);
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View current = dock.findContainingItemView(activity.getCurrentFocus());
+                return current != null && focused.get().equals(((AppAdapter) dock.getAdapter())
+                        .at(dock.getChildAdapterPosition(current)).key());
+            });
+            scenario.onActivity(this::checkViewport);
         }
     }
 
@@ -234,21 +345,30 @@ public class HomeUiTest {
     private void checkViewport(MainActivity activity) {
         RecyclerView grid = activity.findViewById(R.id.grid);
         View root = activity.findViewById(R.id.root);
-        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
-        Rect viewport = new Rect();
-        assertTrue(grid.getGlobalVisibleRect(viewport));
-        for (int i = 0; i < grid.getChildCount(); i++) {
-            View child = grid.getChildAt(i);
-            assertTrue("Tile exceeds right column boundary", child.getRight() <= grid.getWidth());
-            assertTrue("Tile exceeds left column boundary", child.getLeft() >= 0);
-        }
         View focused = activity.getCurrentFocus();
-        View tile = focused == null ? null : grid.findContainingItemView(focused);
-        if (tile != null) {
-            int[] origin = new int[2];
-            tile.getLocationOnScreen(origin);
-            assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
-            assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
+        if (activity.findViewById(R.id.library).getVisibility() != View.VISIBLE) {
+            assertTrue("Top shelf must have room for its title", activity.findViewById(R.id.hero).getHeight() > root.getHeight() / 4);
+            assertTrue("Clock text must not stretch across the screen", activity.findViewById(R.id.clock).getWidth() < root.getWidth() * 0.6f);
+            Rect clock = new Rect(), actions = new Rect();
+            activity.findViewById(R.id.clock).getGlobalVisibleRect(clock);
+            activity.findViewById(R.id.actions).getGlobalVisibleRect(actions);
+            assertFalse("Clock and top actions must not overlap", Rect.intersects(clock, actions));
+        } else {
+            assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
+            Rect viewport = new Rect();
+            assertTrue(grid.getGlobalVisibleRect(viewport));
+            for (int i = 0; i < grid.getChildCount(); i++) {
+                View child = grid.getChildAt(i);
+                assertTrue("Tile exceeds right column boundary", child.getRight() <= grid.getWidth());
+                assertTrue("Tile exceeds left column boundary", child.getLeft() >= 0);
+            }
+            View tile = focused == null ? null : grid.findContainingItemView(focused);
+            if (tile != null) {
+                int[] origin = new int[2];
+                tile.getLocationOnScreen(origin);
+                assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
+                assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
+            }
         }
         RecyclerView dock = activity.findViewById(R.id.dock);
         View dockTile = focused == null ? null : dock.findContainingItemView(focused);
@@ -258,6 +378,9 @@ public class HomeUiTest {
             Rect bounds = new Rect();
             assertTrue(dockTile.getGlobalVisibleRect(bounds));
             assertTrue("Focused dock tile clipped", dockViewport.contains(bounds));
+            View art = ((android.view.ViewGroup) dockTile).getChildAt(0);
+            assertEquals("TV artwork must retain a 16:9 ratio", 16f / 9f,
+                    (float) art.getWidth() / art.getHeight(), 0.03f);
         }
     }
 

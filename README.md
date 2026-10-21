@@ -6,6 +6,15 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 
 **Estado:** hay un proyecto Android compilable y scripts de instalación. El cambio de HOME requiere una operación separada con respaldo. El lanzador original permanece habilitado.
 
+## Instalación completa desde el APK en Windows
+
+El artefacto `AdLessTV-debug-apk` incluye `install-apk.ps1` y las herramientas de
+configuración. Con Python 3.11+ y ADB, `-MakeHome` instala el APK, prepara un plan,
+respalda y reemplaza los componentes HOME conocidos que compiten con AdLessTV.
+No requiere compilar ni instalar dependencias Python con el transporte ADB nativo.
+[Instrucciones, comprobación tras reinicio y restauración](docs/INSTALAR_APK.md).
+
+
 ## Funciones disponibles
 
 - Inicio adaptable: una cuadrícula desplazable con favoritos al principio, tarjetas con proporción fija, reloj y accesos compactos; D-pad y clic del mando.
@@ -49,7 +58,7 @@ export TV_HOST=192.168.1.50
 
 ### Stick 4K con 2 GB de RAM y 8 GB de almacenamiento
 
-`--probe` muestra modelo, dispositivo, compilación, RAM detectada y espacio real de `/data`. La capacidad nominal de 8 GB incluye el sistema: utiliza el espacio libre detectado para decidir si cabe instalar el APK. El instalador borra su copia temporal de `/data/local/tmp` tras intentar la instalación. La interfaz carga imágenes locales opacas bajo demanda en RGB_565, con caché de 2 o 4 MiB según la clasificación de RAM baja del propio Android; cancela trabajos de carátulas obsoletos, no descarga imágenes ni mantiene tareas periódicas. Desde Personalizar puedes reducir el movimiento del foco; el borde continúa visible.
+`--probe` muestra modelo, dispositivo, compilación, RAM detectada y espacio real de `/data`. La capacidad nominal de 8 GB incluye el sistema: utiliza el espacio libre detectado para decidir si cabe instalar el APK. El instalador borra su copia temporal de `/data/local/tmp` tras intentar la instalación. La interfaz carga banners locales 16:9 con alternativa de icono bajo demanda, con caché de 2 o 4 MiB según la clasificación de RAM baja del propio Android; cancela trabajos de carátulas obsoletos, no descarga imágenes ni mantiene tareas periódicas. Desde Personalizar puedes reducir el movimiento del foco; el borde continúa visible.
 
 Puedes generar un borrador de perfil vinculado al modelo y firmware capturados: `python tools/inventory.py --review --output backups/inventario.json` y después `python tools/profile.py --inventory backups/inventario.json --output backups/perfil.json`. Sus pocos candidatos se comprueban manualmente; `debloat.py` rechazará el borrador hasta que hayas revisado cada entrada y cambiado `review_required` a `false`. Los detalles y límites están en [examples/README.md](examples/README.md).
 Si ya tienes una lista orientativa del modelo, `tools/profile.py --list lista.txt` la cruza con ese inventario y separa nombres ausentes, desactivados, protegidos o asociados a funciones delicadas. No convierte la lista en cambios automáticos.
@@ -57,9 +66,11 @@ Con `tools/profile.py --catalog` se selecciona una lista de investigación de `e
 
 El stick normalmente no tiene puertos HDMI de **entrada** ni sintonizador, pero el software comprueba las entradas ofrecidas por Android antes de ocultar el acceso. Para el debloat usa un perfil del **modelo y fingerprint exactos**, y conserva mando, emparejamiento Bluetooth, Play Services/Store y las funciones que utilices. No se borran datos de apps ni cachés indiscriminadamente.
 
+La portada muestra el nombre de la app seleccionada sobre fondo oscuro y favoritos en tarjetas amplias. Pulsa Abajo para abrir el resto de aplicaciones; Atrás o Arriba desde la primera fila vuelve a la portada. El reloj ocupa su contenido y el acento del fondo procede del arte instalado. La versión visual de prueba es `0.3.0-preview.2`. Detalles de correcciones, recursos y límites en [la revisión operativa](docs/REVISION_OPERATIVA.md).
+
 ## Construcción e instalación del lanzador
 
-Requiere **JDK 17**, Android SDK **platform 36 / build-tools 36.0.0** y acceso a los repositorios Android/Gradle. Usa Gradle 9.8.1, Android Gradle Plugin 9.4.1, Java y AndroidX RecyclerView. Compila y apunta a Android 16 (API 36), con compatibilidad declarada desde API 23. Android 17 (API 37) ya se publicó, pero el `sdkmanager` del ejecutor de CI aún no encuentra `platforms;android-37`; no se declara compatibilidad comprobada con esa imagen. La CI comprueba Android 15 y Android TV 14; falta comprobar un televisor físico con firmware más reciente. Para crear el APK sin conectar una TV:
+Requiere **JDK 17**, Android SDK **platform 36 / build-tools 36.0.0** y acceso a los repositorios Android/Gradle. Usa Gradle 9.8.2, Android Gradle Plugin 9.4.1, Java y AndroidX RecyclerView. Compila y apunta a Android 16 (API 36), con compatibilidad declarada desde API 23. Android 17 (API 37) ya se publicó, pero el `sdkmanager` del ejecutor de CI aún no encuentra `platforms;android-37`; no se declara compatibilidad comprobada con esa imagen. La CI comprueba Android 15 y Android TV 14; falta comprobar un televisor físico con firmware más reciente. Para crear el APK sin conectar una TV:
 
 ```bash
 bash launcher/build-and-install.sh --build-only
@@ -79,7 +90,9 @@ PYTHON=.venv/bin/python bash launcher/build-and-install.sh
 .\launcher\build-and-install.ps1 -TvHost 192.168.1.50 -Python .\.venv\Scripts\python.exe
 ```
 
-Para instalar y elegir HOME en una sola operación explícita, usa `--make-home backups/home-tv.json` en Bash o `-HomeSnapshot backups/home-tv.json` en PowerShell. El respaldo debe ser nuevo. Añade `--replace-stock <paquete-exacto>` o `-ReplaceStock <paquete-exacto>` solo tras revisar las otras funciones de ese paquete. Conserva el JSON y utiliza `tools/home.py --restore` para recuperar el inicio anterior.
+Para instalar un HOME permanente, crea una clave privada local con `keytool`, copia `launcher/keystore.properties.example` a `launcher/keystore.properties` y completa sus cuatro datos. Ambos archivos privados (`*.jks` y `keystore.properties`) están excluidos de Git: conserva una copia segura de la clave y sus contraseñas para futuras actualizaciones. El release se minifica y se firma localmente; en CI, sin clave, sigue compilándose el release sin firmar. Sigue [la guía de prueba del onn](docs/PRUEBA_ONN.md) para generar la clave, migrar una vista previa existente y verificar HOME.
+
+Para instalar el release y elegir HOME en una sola operación explícita, usa `--release --make-home backups/home-tv.json` en Bash o `-Release -HomeSnapshot backups/home-tv.json` en PowerShell. El respaldo debe ser nuevo. Añade `--replace-stock <paquete-exacto>` o `-ReplaceStock <paquete-exacto>` solo tras revisar las otras funciones de ese paquete. Conserva el JSON y utiliza `tools/home.py --restore` para recuperar el inicio anterior. La activación desde los scripts de instalación rechaza el APK debug. `home.py` por separado no puede verificar la firma de un APK ya instalado: revisa su procedencia antes de activarlo.
 
 Confirma con el mando que abren tus apps, que vuelves al mismo favorito, que los botones responden y que las entradas funcionan en tu firmware. La pantalla de entradas depende de los servicios de TV que exponga el fabricante; si no hay una acción compatible, usa los ajustes de la TV. En un stick sin entradas de TV detectadas se oculta ese botón y la navegación del mando pasa directamente a los otros accesos.
 

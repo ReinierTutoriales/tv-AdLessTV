@@ -1,5 +1,18 @@
 plugins { id 'com.android.application' }
 
+def signingFile = rootProject.file('keystore.properties')
+def releaseKeys = new Properties()
+if (signingFile.exists()) {
+    signingFile.withInputStream { releaseKeys.load(it) }
+    def missing = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].findAll {
+        !releaseKeys.getProperty(it)?.trim()
+    }
+    if (!missing.isEmpty()) throw new GradleException('Faltan datos de firma: ' + missing.join(', '))
+    if (!rootProject.file(releaseKeys.getProperty('storeFile')).isFile()) {
+        throw new GradleException('No existe el archivo de firma indicado en keystore.properties')
+    }
+}
+
 android {
     namespace 'com.adlesstv.launcher'
     compileSdk 36
@@ -8,8 +21,8 @@ android {
         applicationId 'com.adlesstv.launcher'
         minSdk 23
         targetSdk 36
-        versionCode 2
-        versionName '0.2.0'
+        versionCode 5
+        versionName '0.3.0-preview.3'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
@@ -18,11 +31,23 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        if (signingFile.exists()) {
+            localRelease {
+                storeFile rootProject.file(releaseKeys.getProperty('storeFile'))
+                storePassword releaseKeys.getProperty('storePassword')
+                keyAlias releaseKeys.getProperty('keyAlias')
+                keyPassword releaseKeys.getProperty('keyPassword')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            if (signingFile.exists()) signingConfig signingConfigs.localRelease
         }
     }
 }
