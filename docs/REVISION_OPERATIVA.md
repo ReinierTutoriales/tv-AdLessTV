@@ -1,4 +1,4 @@
-# Revisión operativa — 0.3.0-preview.2
+# Revisión operativa — 0.3.0-preview.3
 
 Revisión del 21 de octubre de 2026, sobre la rama de pruebas del onn. La
 comparación se realiza por mecanismos del código, no por popularidad ni por
@@ -103,3 +103,34 @@ También se corrigió el inventario para admitir `package:android`, el paquete d
 framework que Android devuelve realmente junto a los nombres con puntos. El
 respaldo múltiple tiene versión 3 y se maneja con `home_setup.py`; los respaldos
 anteriores conservan su herramienta original.
+
+
+## Segunda comparación directa con la fuente
+
+Fuente revisada: `Gathin23/cleanyourtv`, commit
+`8de5533` del 21 de octubre de 2026. Se compararon los mecanismos de
+`MainActivity`, `AppAdapter`, `LibraryApps`, `GridNavigation`, los scripts de
+instalación y las notas de dispositivos, incluidos los cambios posteriores a
+`66b7214`. No se trata de copiar las cifras del README ni de equiparar funciones
+por su nombre.
+
+| Mecanismo observado en la fuente | Estado en AdLessTV |
+| --- | --- |
+| Dock, título de app, acento local, biblioteca al bajar y regreso con Inicio | Implementados; las pruebas recorren foco, biblioteca, Inicio y texto ampliado. |
+| Actualizar apps sin arrebatar el foco a los botones superiores | Corregido en preview.3: se captura el componente y el dueño del foco antes de reenlazar. |
+| Ignorar la retirada provisional de un APK durante una actualización | Replicado: PACKAGE_REMOVED con EXTRA_REPLACING no vacía el catálogo ni invalida imágenes. La instalación/reemplazo posterior sí lo actualiza. |
+| Soltar imágenes de vistas cuando el launcher está oculto y hay presión de memoria | Replicado y adaptado a dos RecyclerView: desconectar adaptadores, vaciar pools, cancelar cargas e invalidar caché; volver a enlazar y recuperar el foco al regresar. No se desconecta la interfaz visible. |
+| Conservar retorno rápido desde otra app | La transición UI_HIDDEN vacía la caché, pero conserva las tarjetas enlazadas; la desconexión completa requiere presión de memoria. Los dos workers de arte dejan terminar sus hilos tras 15 segundos sin trabajo. |
+| Desactivar competidores HOME, comprobar el resultado y restaurar | Implementado en el plan múltiple HOME con diario por paquete, comprobaciones Wi-Fi/Cast y recuperación. Las herramientas no desinstalan paquetes del sistema. |
+| Configuración de temas externos, módulos de otras apps, vídeos y servicios de accesibilidad para botones | No implementados en esta revisión. Los tres temas locales de AdLessTV no equivalen a ese sistema de extensiones. |
+
+Las nuevas pruebas instrumentadas verifican conservación de foco ante un
+reemplazo y liberación de la referencia al bitmap de una tarjeta reciclada,
+además de la recuperación del foco tras liberar las vistas ocultas. Eso prueba
+comportamientos y referencias, no una reducción medida de PSS en el onn ni
+superioridad de rendimiento frente a la fuente.
+
+Referencias comprobadas:
+- [Fuente y revisión exacta](https://github.com/Gathin23/cleanyourtv/tree/8de5533).
+- [Ciclo de memoria de Android](https://developer.android.com/reference/android/content/ComponentCallbacks2).
+- [Contrato de los niveles de memoria en AOSP](https://android.googlesource.com/platform/frameworks/base/+/main/core/java/android/content/ComponentCallbacks2.java).

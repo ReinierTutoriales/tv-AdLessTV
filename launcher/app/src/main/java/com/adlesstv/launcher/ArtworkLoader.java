@@ -35,7 +35,7 @@ final class ArtworkLoader {
 
     private final Context context;
     private final Listener listener;
-    private final ThreadPoolExecutor workers = new ThreadPoolExecutor(2, 2, 0L,
+    private final ThreadPoolExecutor workers = new ThreadPoolExecutor(2, 2, 15L,
             TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
     private final Handler main = new Handler(Looper.getMainLooper());
     private static final class Load {
@@ -51,6 +51,7 @@ final class ArtworkLoader {
 
     ArtworkLoader(Context context, Listener listener) {
         this.context = context.getApplicationContext();
+        workers.allowCoreThreadTimeOut(true);
         this.listener = listener;
         ActivityManager memory = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         int bytes = memory != null && memory.isLowRamDevice() ? 2 * 1024 * 1024 : 4 * 1024 * 1024;

@@ -55,6 +55,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private final List<AppRepository.App> pinned = new ArrayList<>();
     private final BroadcastReceiver packageChanges = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_PACKAGE_REMOVED.equals(intent.getAction())
+                    && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return;
             dirty = true;
             artwork.invalidate();
             if (resumed) refresh();
@@ -83,6 +85,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private String lastFocused;
     private String lastDockFocused;
     private boolean resumed;
+    private boolean started;
+    private boolean catalogReady;
+    private boolean artworkReleased;
+    private boolean restoreFocusAfterRelease;
     private boolean dirty = true;
     private boolean scanning;
     private boolean destroyed;
@@ -256,9 +262,27 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        started = true;
+    }
+
+    @Override protected void onStop() {
+        started = false;
+        super.onStop();
+    }
+
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
+        if (artworkReleased) {
+            grid.setAdapter(adapter);
+            dock.setAdapter(dockAdapter);
+            artworkReleased = false;
+            if (pendingGridPosition >= 0 || pendingDockPosition >= 0) main.post(this::applyPendingFocus);
+            else if (restoreFocusAfterRelease) focusLastApp();
+            restoreFocusAfterRelease = false;
+        }
         updateInputsVisibility();
         if (dirty) refresh();
     }
@@ -278,7 +302,23 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     @Override public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && artwork != null) artwork.trim();
+        if (artwork == null) return;
+        boolean pressure = level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+                || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
+                || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL;
+        if (pressure || level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) artwork.trim();
+        // Eviction alone cannot free bitmaps still owned by attached/recycled tile views.
+        // Retain the visible UI and ordinary app-return path; release hidden views under pressure.
+        if (!pressure || started || artworkReleased) return;
+        restoreFocusAfterRelease = grid.hasFocus() || dock.hasFocus();
+        pendingGridPosition = RecyclerView.NO_POSITION;
+        pendingDockPosition = RecyclerView.NO_POSITION;
+        artworkReleased = true;
+        grid.setAdapter(null);
+        dock.setAdapter(null);
+        grid.getRecycledViewPool().clear();
+        dock.getRecycledViewPool().clear();
+        artwork.invalidate();
     }
 
     @Override protected void onDestroy() {
@@ -323,6 +363,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void render() {
+        final String returnKey = lastFocused;
+        final boolean restoreFocus = !catalogReady || grid.hasFocus() || dock.hasFocus()
+                || pendingGridPosition >= 0 || pendingDockPosition >= 0;
+        catalogReady = true;
         pendingGridPosition = RecyclerView.NO_POSITION;
         pendingDockPosition = RecyclerView.NO_POSITION;
         Map<String, AppRepository.App> byKey = new HashMap<>();
@@ -345,8 +389,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         findViewById(R.id.library_hint).setVisibility(rest.isEmpty() ? View.GONE : View.VISIBLE);
         if (pinned.isEmpty()) showLibrary(true);
         selectedApp = null;
-        int inDock = dockAdapter.indexOf(lastFocused);
-        int inGrid = adapter.indexOf(lastFocused);
+        int inDock = dockAdapter.indexOf(returnKey);
+        int inGrid = adapter.indexOf(returnKey);
         if (inDock >= 0) selectedApp = dockAdapter.at(inDock);
         else if (inGrid >= 0) selectedApp = adapter.at(inGrid);
         else if (dockAdapter.firstApp() >= 0) selectedApp = dockAdapter.at(dockAdapter.firstApp());
@@ -354,6 +398,15 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         updateHero();
         empty.setText(R.string.no_apps);
         empty.setVisibility(adapter.firstApp() < 0 && dockAdapter.firstApp() < 0 ? View.VISIBLE : View.GONE);
+        if (!restoreFocus) return;
+        if (inDock >= 0 || (inGrid < 0 && dockAdapter.firstApp() >= 0))
+            focusDock(inDock >= 0 ? inDock : dockAdapter.firstApp());
+        else focusGrid(inGrid >= 0 ? inGrid : adapter.firstApp());
+    }
+
+    private void focusLastApp() {
+        int inDock = dockAdapter.indexOf(lastFocused);
+        int inGrid = adapter.indexOf(lastFocused);
         if (inDock >= 0 || (inGrid < 0 && dockAdapter.firstApp() >= 0))
             focusDock(inDock >= 0 ? inDock : dockAdapter.firstApp());
         else focusGrid(inGrid >= 0 ? inGrid : adapter.firstApp());

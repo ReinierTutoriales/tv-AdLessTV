@@ -238,6 +238,71 @@ public class HomeUiTest {
         }
     }
 
+    @Test public void packageRefreshKeepsTopActionFocusAndSkipsReplacementRemoval() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            java.lang.reflect.Field receiver = MainActivity.class.getDeclaredField("packageChanges");
+            java.lang.reflect.Field artwork = MainActivity.class.getDeclaredField("artwork");
+            java.lang.reflect.Field scanning = MainActivity.class.getDeclaredField("scanning");
+            receiver.setAccessible(true); artwork.setAccessible(true); scanning.setAccessible(true);
+            scenario.onActivity(activity -> {
+                try {
+                    activity.findViewById(R.id.action_network).requestFocus();
+                    ArtworkLoader loader = (ArtworkLoader) artwork.get(activity);
+                    int before = loader.revision();
+                    android.content.BroadcastReceiver changes = (android.content.BroadcastReceiver) receiver.get(activity);
+                    changes.onReceive(activity, new Intent(Intent.ACTION_PACKAGE_REMOVED)
+                            .putExtra(Intent.EXTRA_REPLACING, true));
+                    assertEquals("An update must not remove the old tile temporarily", before, loader.revision());
+                    changes.onReceive(activity, new Intent(Intent.ACTION_PACKAGE_REPLACED));
+                    assertTrue("The updated APK needs fresh artwork", loader.revision() > before);
+                } catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            waitUntil(scenario, activity -> {
+                try { return !scanning.getBoolean(activity); }
+                catch (IllegalAccessException error) { throw new AssertionError(error); }
+            });
+            scenario.onActivity(activity -> assertSame("A package update must not steal top action focus",
+                    activity.findViewById(R.id.action_network), activity.getCurrentFocus()));
+        }
+    }
+
+    @Test public void memoryPressureReleasesHiddenTilesAndRestoresTheirFocus() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            waitUntil(scenario, activity -> ((RecyclerView) activity.findViewById(R.id.dock))
+                    .findContainingItemView(activity.getCurrentFocus()) != null);
+            java.util.concurrent.atomic.AtomicReference<String> focused = new java.util.concurrent.atomic.AtomicReference<>();
+            java.util.concurrent.atomic.AtomicReference<AppAdapter.Tile> tile = new java.util.concurrent.atomic.AtomicReference<>();
+            scenario.onActivity(activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                tile.set((AppAdapter.Tile) dock.findContainingItemView(activity.getCurrentFocus()));
+                focused.set(((AppAdapter) dock.getAdapter()).at(dock.getChildAdapterPosition(tile.get())).key());
+                activity.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL);
+                assertNotNull("Visible Home must not lose its adapter", dock.getAdapter());
+            });
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED);
+            scenario.onActivity(activity -> {
+                activity.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
+                assertNotNull("An ordinary app return retains the tiles", ((RecyclerView) activity.findViewById(R.id.dock)).getAdapter());
+                activity.onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
+                assertNull(((RecyclerView) activity.findViewById(R.id.grid)).getAdapter());
+                assertNull(((RecyclerView) activity.findViewById(R.id.dock)).getAdapter());
+                assertNull("Recycled tiles must release their bitmap", tile.get().icon.getDrawable());
+            });
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED);
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                View current = dock.findContainingItemView(activity.getCurrentFocus());
+                return current != null && focused.get().equals(((AppAdapter) dock.getAdapter())
+                        .at(dock.getChildAdapterPosition(current)).key());
+            });
+            scenario.onActivity(this::checkViewport);
+        }
+    }
+
     /** Only the artificial-catalog test suspends package events; the installed-app test stays live. */
     private final class FixedCatalog implements AutoCloseable {
         private final ActivityScenario<MainActivity> scenario;
