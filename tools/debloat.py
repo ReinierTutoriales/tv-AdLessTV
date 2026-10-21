@@ -297,6 +297,51 @@ def verify(dev, data):
     print(f"Verificados {len(data['packages'])} paquetes del respaldo; estados conservados.")
 
 
+def fix(dev, data, path):
+    """Disable again what a firmware update re-enabled. The backup keeps each original state,
+    so `restore` still returns the TV to how it was before the first run."""
+    validate_snapshot(data)
+    require_user_zero(dev)
+    if identity(dev) != data["device"]:
+        raise ValueError("El respaldo pertenece a otra TV o a otro perfil.")
+    firmware = shell(dev, "getprop ro.build.fingerprint").strip()
+    if data.get("firmware") and firmware != data["firmware"]:
+        print(f"Aviso: firmware actualizado ({data['firmware']} → {firmware}); se revisan los mismos paquetes.")
+    drifted, skipped = [], []
+    protected = protected_packages(dev)
+    for entry in data["packages"]:
+        if entry["status"] == "pending":
+            raise ValueError(f"{entry['package']}: cambio interrumpido; restaura el respaldo antes de reparar.")
+        if entry["status"] != "applied":
+            continue
+        try:
+            state = package_state(dev, entry["package"])
+        except ValueError as exc:
+            skipped.append(str(exc))
+            continue
+        if state == 3:
+            continue
+        if entry["package"] in protected:
+            skipped.append(f"{entry['package']}: ahora es HOME, teclado, entrada, accesibilidad o VPN; se deja activo")
+            continue
+        drifted.append(entry["package"])
+    if drifted:
+        check_wifi_provisioning(dev, drifted)
+    for package in drifted:
+        shell(dev, f"pm disable-user --user 0 {package}")
+        if package_state(dev, package) != 3:
+            raise RuntimeError(f"No se confirmó la desactivación de {package}")
+        print(f"Desactivado de nuevo: {package}")
+    data.setdefault("fixed", []).append({"at": datetime.now(timezone.utc).isoformat(),
+                                         "firmware": firmware, "packages": drifted})
+    write_snapshot(path, data)
+    for message in skipped:
+        print("Revisar a mano: " + message)
+    if not drifted and not skipped:
+        print("Sin cambios: la TV conserva el estado del respaldo.")
+    return 1 if skipped else 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host")
@@ -311,6 +356,8 @@ def main(argv=None):
     undo.add_argument("snapshot", type=Path)
     check = sub.add_parser("verify", help="Comprueba sin cambios el estado tras reiniciar")
     check.add_argument("snapshot", type=Path)
+    check.add_argument("--fix", action="store_true",
+                       help="Vuelve a desactivar lo que una actualización reactivó (mismas protecciones)")
     args = parser.parse_args(argv)
     if args.action == "disable" and bool(args.list) == bool(args.profile):
         parser.error("Indica exactamente una lista o --profile.")
@@ -329,6 +376,8 @@ def main(argv=None):
         dev = connect(args.host, args.port)
         if args.action == "restore":
             restore(dev, data, args.snapshot)
+        elif args.action == "verify" and args.fix:
+            return fix(dev, data, args.snapshot)
         elif args.action == "verify":
             verify(dev, data)
         else:

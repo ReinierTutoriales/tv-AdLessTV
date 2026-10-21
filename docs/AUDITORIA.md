@@ -6,7 +6,7 @@ Revisión estática del código y de la interfaz. La imagen de referencia aporta
 
 | Elemento | Estado | Criterio |
 | --- | --- | --- |
-| Cabecera con reloj y accesos | Implementado | Reloj local, entradas disponibles, acceso a ajustes de Wi-Fi y ajustes; sin observar el estado de red ni ejecutar servicios de fondo. |
+| Cabecera con reloj y accesos | Implementado | Saludo, reloj, fecha, memoria y almacenamiento; botón de red con tipo y nombre de Wi-Fi (este último con permiso de ubicación pedido a demanda), escuchado solo con Inicio visible. |
 | Zona destacada | Implementado inicialmente | El nombre cambia con el foco; Abrir e Información funcionan sobre la selección. Queda comprobar escala, recorte y navegación con mando en los dos emuladores y una TV. |
 | Tarjetas redondeadas y foco | Implementado inicialmente | Borde visible y animación corta. El arte procede de los APK instalados, con caché acotada; ninguna imagen se descarga. |
 | Catálogo de instaladas | Implementado | Dock horizontal de favoritos y resto de instaladas en cuadrícula desplazable, una entrada por paquete. No hay recomendaciones ni contenido remoto. |
@@ -25,7 +25,7 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 - El debloat comprueba la configuración Wi-Fi antes de desactivar un paquete conocido de provisión. Si aparece como creador de la red guardada o no se puede leer la información, cancela sin registrar nombres de red en el respaldo. Se vuelve a consultar justo antes de modificarlo; los formatos de `dumpsys wifi` varían según el fabricante y no justifican una promesa universal.
 - La sustitución opcional del HOME anterior usa la misma comprobación Wi-Fi, tanto antes de cambiar HOME como inmediatamente antes de desactivar el paquete. Si el paquete creó una red guardada o el estado no puede determinarse, no se desactiva. El flujo ordinario deja el HOME anterior habilitado.
 - Las carátulas opacas se renderizan en RGB_565 (73 728 bytes por tarjeta de 256 × 144) y el resultado se incorpora a la caché únicamente si la petición aún pertenece a la generación actual. Las peticiones anteriores se cancelan al cambiar el catálogo. La opción local «Reducir movimiento» quita la escala animada del foco sin ocultar su borde.
-- El acceso directo a Wi-Fi ya no consulta la red ni necesita `ACCESS_NETWORK_STATE`. Los APK debug y release solo pueden declarar el permiso interno `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` que protege receptores dinámicos; no concede acceso a la red.
+- (Sustituido el 21-oct-2026: el botón de red vuelve a leer el estado de conexión para mostrar tipo y nombre; sigue sin permiso INTERNET.) Antes, el acceso directo a Wi-Fi no consultaba la red. Los APK debug y release solo pueden declarar el permiso interno `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` que protege receptores dinámicos; no concede acceso a la red.
 - El ZIP del wrapper Gradle 9.8.1 se valida con su SHA-256 oficial; el JAR presente coincide con la suma publicada por Gradle. `gradlew` ya tiene modo Git `100755`.
 
 ## Revisión del 21 de octubre de 2026
@@ -37,6 +37,23 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 - Dependencias: Gradle 9.8.2 (SHA-256 oficial `21bd5da2…9607`), `compileSdk` 37 (identificador del SDK: `platforms;android-37.0`); `targetSdk` se mantiene en 36 porque es lo validado en emuladores de TV, AGP 9.4.1, RecyclerView 1.4.0 y AndroidX Test 1.7.0/1.3.0 ya eran las últimas estables. JDK 21 en CI. Acciones fijadas por SHA: checkout v7.0.1, setup-java v6.1.0, setup-python v7.0.0, setup-android v4.0.4, upload-artifact v7.0.2, android-emulator-runner v2.38.0.
 - Matriz de interfaz: Android TV 14 x86 con 2 GB de RAM y Android TV 16 x86_64 con 2 GB (obligatorias, pasan completas incluidos dos reinicios con restauración del HOME). Android 17 `google_apis` es informativa: su imagen de CI pierde `/sdcard` o el servicio `package` tras arrancar, antes de ejecutar las pruebas.
 
+## Ampliación del 21 de octubre de 2026 (2)
+
+| Área | Implementado | Decisión de seguridad o rendimiento |
+| --- | --- | --- |
+| Temas | `config.json` + `wallpaper.jpg` por `tools/theme.py`; 20 claves documentadas en `docs/TEMAS.md` | Proveedor que solo acepta el shell de ADB y dos nombres de archivo; recarga por `intent` sin forzar la parada; claves inválidas ignoradas |
+| Fondo de pantalla | Recorte central, atenuado 0–90 % | Muestreo al tamaño de pantalla, RGB_565 por defecto, límite 10 MB / 4K |
+| Red | Tipo de conexión y nombre de la Wi-Fi | `NetworkCallback` registrado solo en primer plano; ubicación solicitada a demanda |
+| Resaltado de cristal | Una vista que se desliza al foco | Se mueve solo por eventos de foco y desplazamiento; sin bucle de animación |
+| Biblioteca, saludo, reloj por inactividad | Diálogo de casillas; saludo enlazado al tic del reloj; reloj a pantalla completa opcional | El reloj por inactividad solo corre con Inicio visible |
+| Botones del mando | `RemoteKeyService` opcional, `tools/keys.py` con respaldo | Solo filtra teclas configuradas; `KEYCODE_TV` no se reasigna por defecto |
+| Tarjetas de otras apps | Acción `com.adlesstv.launcher.action.CARD` | Una pregunta por paquete, actividad y firma; ocultar por defecto |
+| Reparación tras actualización | `debloat.py verify --fix` | Mismas protecciones; el respaldo conserva los estados originales |
+| Listas por modelo | 158 carpetas en `examples/` | Compatibles con `read_packages`; el plan sigue rechazando HOME, teclados y entradas |
+| Idiomas | 21 | Lint falla si falta una cadena en cualquier idioma |
+
+No se implementan: liberador de RAM (sin efecto medible), clima o calendarios con datos externos (requieren red), pieles festivas y fondos animados (coste de GPU en 2 GB sin función práctica).
+
 ## Pendientes con evidencia insuficiente
 
 1. Las pruebas de compilación, lint e interfaz pasaron en los emuladores de TV API 34 y Android API 35 para el cambio visual anterior; repetir la matriz al publicar cada nueva modificación. Las capturas cubren 960 × 540 y 720 × 480, pero no prueban fluidez ni todos los mandos.
@@ -45,6 +62,7 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 4. API 37: resuelto el identificador (`platforms;android-37.0`); compilación y lint pasan. Subir `targetSdk` a 37 cuando la imagen de Android 17 sea estable en CI o exista una TV con Android 17 donde probarlo.
 5. Decidir la distribución firmada. `assembleRelease` produce un APK sin firmar; el script instala el debug. Crear un flujo de firma privado y actualización sin comprometer la clave antes de usarlo como HOME permanente.
 6. Acciones de CI fijadas por SHA completo (hecho). Queda revisar el indicador de HOME de `dumpsys activity`, que no es API pública.
+8. Probar en TV física el servicio de botones (los códigos de tecla varían por mando), el nombre de la Wi-Fi tras conceder ubicación y `tools/theme.py` en firmware que bloquee `Android/data`.
 7. Comprobar en una TV con entradas HDMI reales los nombres, el orden y el estado de la fila «Entradas»: los emuladores no publican entradas de paso.
 
 La ausencia de permisos de red, identificación y localización en el APK, junto con la revisión del código, respalda que el lanzador no incorpora telemetría propia. Esto no verifica el tráfico de otras apps o del firmware: reducir la telemetría del dispositivo requiere el inventario y la medición de red por firmware descritos en `DISENO.md`.

@@ -67,6 +67,7 @@ Después de cambios importantes:
 - Antes de activar, confirma que HOME sigue abriendo el lanzador existente; después confirma que abre AdLessTV y que `tools/home.py --restore` permite regresar.
 - Sin ordenador, Personalizar → «Volver al lanzador original» abre otro HOME habilitado (antes de Android 10 retira también la preferencia de AdLessTV). No sustituye al respaldo: si se desactivó el lanzador de fábrica, solo `tools/home.py --restore` lo recupera.
 - La fila «Entradas» solo muestra fuentes que publica `TvInputManager`; verifica nombres y estado en la TV física.
+- Temas: `python tools/theme.py <carpeta>` / `--reset` (claves en `docs/TEMAS.md`). Botones del mando: `tools/keys.py --enable/--restore <respaldo>`, solo si el usuario lo pide. Tras una actualización de firmware: `tools/debloat.py verify --fix <respaldo>`.
 - Para cambios de código: ejecuta `python -m unittest discover -s tests -v`; no presentes pruebas simuladas como validación en TV.
 - Confirma que Inputs y apps principales siguen funcionando.
 

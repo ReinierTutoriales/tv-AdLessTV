@@ -68,6 +68,12 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     /** Inputs come first: a short row of real HDMI/AV/tuner sources that never needs scrolling. */
     void replace(List<AppRepository.App> favorites, List<AppRepository.App> apps, List<AppRepository.App> inputs) {
+        replace(favorites, apps, inputs, java.util.Collections.emptyList());
+    }
+
+    /** Sections in order: favorites, inputs, apps, then cards other apps were allowed to show. */
+    void replace(List<AppRepository.App> favorites, List<AppRepository.App> apps, List<AppRepository.App> inputs,
+                 List<AppRepository.App> cards) {
         List<Entry> next = new ArrayList<>();
         if (!favorites.isEmpty()) {
             if (!dock) next.add(new Entry(null, R.string.favorites, 0));
@@ -80,6 +86,10 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (!apps.isEmpty()) {
             next.add(new Entry(null, R.string.all_apps, 0));
             for (AppRepository.App app : apps) next.add(new Entry(app, 0, artwork.revision()));
+        }
+        if (!cards.isEmpty()) {
+            next.add(new Entry(null, R.string.cards, 0));
+            for (AppRepository.App card : cards) next.add(new Entry(card, 0, artwork.revision()));
         }
         List<Entry> previous = new ArrayList<>(items);
         DiffUtil.DiffResult changes = DiffUtil.calculateDiff(new DiffUtil.Callback() {
@@ -95,6 +105,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 if (previous.get(oldPosition).artworkRevision != next.get(newPosition).artworkRevision
                         || !old.label.equals(now.label) || old.isInput() != now.isInput()) return false;
                 if (old.isInput()) return old.inputState == now.inputState;
+                if (!Objects.equals(old.caption, now.caption)) return false;
                 return Objects.equals(old.info.activityInfo.applicationInfo.sourceDir,
                         now.info.activityInfo.applicationInfo.sourceDir);
             }
@@ -107,6 +118,13 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     void setColumns(int columns) { this.columns = columns; updateNavigation(); }
     void setReducedMotion(boolean enabled) { reducedMotion = enabled; }
+    private boolean glass;
+    /** With the floating highlight the tile only brightens on focus; the glass draws the outline. */
+    void setGlass(boolean enabled) {
+        if (glass == enabled) return;
+        glass = enabled;
+        notifyItemRangeChanged(0, getItemCount());
+    }
     private void updateNavigation() {
         boolean[] headings = new boolean[items.size()];
         for (int i = 0; i < headings.length; i++) headings[i] = isHeading(i);
@@ -162,6 +180,11 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (entry.app == null) { ((TextView) base.itemView).setText(entry.heading); return; }
         Holder holder = (Holder) base;
         AppRepository.App app = entry.app;
+        int background = glass ? R.drawable.focus_card_glass : R.drawable.focus_card;
+        if (!Integer.valueOf(background).equals(holder.tile.getTag(R.id.glass))) {
+            holder.tile.setBackgroundResource(background);
+            holder.tile.setTag(R.id.glass, background);
+        }
         holder.tile.label.setText(app.label);
         holder.tile.setContentDescription(app.isInput() ? context.getString(R.string.input_description,
                 app.label, context.getString(InputStates.label(app.inputState))) : app.label);

@@ -1,0 +1,15 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- With the floating highlight on, the tile itself only brightens; the glass draws the outline. -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#33445A" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#222A37" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+</selector>

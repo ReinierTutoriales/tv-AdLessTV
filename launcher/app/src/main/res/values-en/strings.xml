@@ -47,4 +47,23 @@
     <string name="original_home_missing" tools:ignore="TypographyDashes">No other launcher is enabled. If the factory launcher was disabled, restore it from the computer with tools/home.py --restore and the HOME backup.</string>
     <string name="columns">Apps per row</string>
     <string name="columns_auto">Automatic</string>
+    <string name="cards">Cards</string>
+    <string name="cards_manage">Cards from other apps</string>
+    <string name="card_request_title">New card on Home</string>
+    <string name="card_request">“%1$s” wants to show the card “%2$s” on Home.</string>
+    <string name="card_allow">Show</string>
+    <string name="card_keep_hidden">Keep hidden</string>
+    <string name="app_library">App library</string>
+    <string name="follow_theme">Follow theme</string>
+    <string name="network_name_show">Show the Wi-Fi name</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_ethernet">Ethernet</string>
+    <string name="network_none">No network</string>
+    <string name="storage_free">%1$s storage</string>
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+    <string name="greeting_named">%1$s, %2$s</string>
+    <string name="key_service">AdLessTV remote buttons</string>
+    <string name="key_service_description">Optional. Restores remote buttons that only the factory launcher handled (Inputs, an app, Settings). It reads no screen content and passes every other key through.</string>
 </resources>

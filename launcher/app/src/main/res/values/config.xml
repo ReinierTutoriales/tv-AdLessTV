@@ -6,4 +6,10 @@
         <item>com.google.android.youtube.tv</item>
         <item>com.plexapp.android</item>
     </string-array>
+    <!-- Packages never shown as tiles (a theme's hidden_apps replaces this list). -->
+    <string-array name="hidden_apps" />
+    <!-- Live TV app opened by a tuner input when the input service has no activity of its own. -->
+    <string name="live_tv_package" translatable="false"></string>
+    <!-- Remote buttons that open an app, for the optional key service: "keycode:package". -->
+    <string-array name="app_keys" />
 </resources>

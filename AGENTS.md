@@ -11,7 +11,7 @@ Compatible con Claude Code, OpenAI Codex, Cursor y otros agentes que lean el est
 - **Nunca** uses `pm uninstall` en paquetes del sistema. Solo `pm disable-user --user 0`.
 - Todo cambio debe ser reversible. Usa o genera `tools/restore.sh`.
 - Para operaciones en la TV, usa ADB real (TV_HOST + tools/tv.py). Para código sin dispositivo, ejecuta las pruebas y declara pendiente la validación física.
-- El lanzador debe ser ligero: Java + AndroidX RecyclerView, sin red, sin servicios en segundo plano.
+- El lanzador debe ser ligero: Java + AndroidX RecyclerView, sin permiso INTERNET ni conexiones de red, sin servicios permanentes por defecto. Lo que necesita más (nombre de la Wi-Fi, servicio de botones del mando, tarjetas de otras apps) es opcional, se activa a propósito y se puede revertir. La CI acepta solo la lista cerrada de permisos de `launcher.yml`.
 - Pregunta al usuario antes de desactivar apps o servicios que pueda querer conservar (voz, Chromecast, actualizaciones, Live TV).
 - Idioma preferido: español.
 

@@ -47,4 +47,23 @@
     <string name="original_home_missing" tools:ignore="TypographyDashes">No hay otro lanzador habilitado. Si se desactivó el de fábrica, restáuralo desde el ordenador con tools/home.py --restore y el respaldo HOME.</string>
     <string name="columns">Aplicaciones por fila</string>
     <string name="columns_auto">Automático</string>
+    <string name="cards">Tarjetas</string>
+    <string name="cards_manage">Tarjetas de otras apps</string>
+    <string name="card_request_title">Nueva tarjeta en Inicio</string>
+    <string name="card_request">«%1$s» quiere mostrar la tarjeta «%2$s» en Inicio.</string>
+    <string name="card_allow">Mostrar</string>
+    <string name="card_keep_hidden">Mantener oculta</string>
+    <string name="app_library">Biblioteca de aplicaciones</string>
+    <string name="follow_theme">Seguir el tema</string>
+    <string name="network_name_show">Mostrar el nombre de la Wi-Fi</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_ethernet">Ethernet</string>
+    <string name="network_none">Sin red</string>
+    <string name="storage_free">%1$s de almacenamiento</string>
+    <string name="greeting_morning">Buenos días</string>
+    <string name="greeting_afternoon">Buenas tardes</string>
+    <string name="greeting_evening">Buenas noches</string>
+    <string name="greeting_named">%1$s, %2$s</string>
+    <string name="key_service">Botones del mando de AdLessTV</string>
+    <string name="key_service_description">Opcional. Devuelve la función a botones del mando que solo atendía el lanzador de fábrica (Entradas, una app, Ajustes). No lee el contenido de la pantalla y deja pasar las demás teclas.</string>
 </resources>

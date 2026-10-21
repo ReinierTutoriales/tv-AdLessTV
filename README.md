@@ -15,6 +15,14 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 - Carátulas decodificadas a densidad xhdpi (banners) y xxhdpi (iconos) aunque la TV use mdpi o tvdpi, para que no se vean borrosas; un solo hilo de decodificación en equipos de poca RAM, y al abrir una app se conserva la mitad de la caché para volver a Inicio sin redibujar todo.
 - Recuperación del foco por identidad al volver de una aplicación, sin volver a consultar todos los paquetes ni reconstruir el inicio.
 - Fila **Entradas** con las fuentes reales que expone Android (HDMI, AV, sintonizador), con el nombre personalizado de los ajustes de la TV y su estado (conectada, en espera, sin señal). Se actualiza por eventos del sistema, sin sondeo; en un stick sin entradas no aparece.
+- **Temas sin recompilar** (`tools/theme.py`): colores, fondo de pantalla atenuable, favoritos, apps ocultas, nombres, columnas, saludo y reloj por inactividad. Ver [`docs/TEMAS.md`](docs/TEMAS.md).
+- Botón de red con el tipo de conexión (Wi-Fi, Ethernet, sin red) y, si lo autorizas desde Personalizar, el nombre de la Wi-Fi. Se actualiza por eventos del sistema solo mientras Inicio está visible.
+- Resaltado flotante tipo cristal que se desliza entre tarjetas; con movimiento reducido salta sin animación.
+- Saludo según la hora sobre el reloj, sin temporizador propio.
+- Biblioteca de aplicaciones: todas las apps con casilla para mostrarlas u ocultarlas en bloque.
+- **Botones del mando opcionales** (Entradas, una app, Ajustes) con `tools/keys.py`, reversible. Ver [`docs/BOTONES.md`](docs/BOTONES.md).
+- **Tarjetas de otras apps** con aprobación por paquete y firma. Ver [`docs/TARJETAS.md`](docs/TARJETAS.md).
+- 21 idiomas, que siguen el idioma de la TV: español, inglés, alemán, francés, italiano, portugués, catalán, neerlandés, polaco, checo, ruso, turco, árabe, hebreo, chino simplificado y tradicional, tailandés, finés, vietnamita, indonesio y noruego.
 - Memoria libre del sistema junto a la fecha (dato de `ActivityManager`, leído al volver a Inicio; nunca se sondea). Se oculta desde Personalizar.
 - **Volver al lanzador original** desde Personalizar, sin ordenador: abre otro lanzador habilitado y, antes de Android 10, retira la preferencia de AdLessTV para que Inicio pregunte de nuevo. Si el lanzador de fábrica se desactivó, indica cómo restaurarlo con el respaldo HOME.
 - Al pulsar Abajo desde los favoritos, la cuadrícula sube sobre el dock y la cabecera se reduce al nombre de la app enfocada; Arriba desde la primera fila devuelve el dock. Así caben más filas a 720 × 480 o con texto ampliado.
@@ -132,9 +140,20 @@ Para restaurar el HOME anterior, incluido su estado habilitado original (incluso
 
 En Windows, reemplaza `.venv/bin/python` por `.\.venv\Scripts\python.exe`. `home.py` comprueba el lanzador instalado, intenta abrirlo, conserva la identidad de la TV y verifica el HOME resultante. Si no puede detectar un HOME anterior único o el fabricante bloquea la operación, configura la aplicación de inicio desde los ajustes del televisor. El HOME anterior solo se desactiva con la operación opcional explícita; ya no exige que el firmware haya conservado antes la selección. El cambio de HOME es independiente del debloat y usa un respaldo distinto. La activación y la restauración esperan 12 segundos y las colas de PackageManager disponibles antes de sincronizar; no reinicies ni cortes la alimentación mientras el script indica que está guardando. Esta espera evita perder las escrituras diferidas de Android, pero no certifica firmware OEM. No abras aplicaciones entre el reinicio y la verificación: esta exige que AdLessTV esté ya visible, sin abrirlo desde el verificador. Comprueba el identificador de arranque (o el contador de arranques cuando el kernel no lo expone); no garantiza el resultado tras todos los futuros reinicios o actualizaciones de firmware.
 
-El salvapantallas de reloj se selecciona manualmente en los ajustes de salvapantallas del televisor; su disponibilidad también depende del fabricante. El lanzador no solicita permisos de red, identificación ni localización y no incorpora analítica ni ejecuta servicios permanentes. El botón de red solo abre los ajustes de Wi-Fi; no lee ni vigila el estado de la conexión. Favoritos y aplicaciones ocultas se guardan en preferencias locales de la TV; el manifiesto desactiva la copia de seguridad de la aplicación y define exclusiones de transferencia. La CI comprueba que los APK debug y release no declaren permisos salvo el permiso interno que protege receptores dinámicos. Esto no controla el tráfico de otras aplicaciones instaladas ni demuestra que el firmware carezca de telemetría. `launcher/app/src/main/res/values/config.xml` proporciona favoritos iniciales. Después, las decisiones hechas con el mando se guardan en la TV y prevalecen sobre ese XML.
+El salvapantallas de reloj se selecciona manualmente en los ajustes de salvapantallas del televisor; su disponibilidad también depende del fabricante. El lanzador **no declara el permiso INTERNET**, no abre conexiones y no incorpora analítica. Declara solo el estado de red y de Wi-Fi para mostrar el tipo de conexión, y la ubicación, que Android exige para leer el nombre de una Wi-Fi: se pide únicamente si eliges «Mostrar el nombre de la Wi-Fi» y puedes revocarla en Ajustes → Apps. Las escuchas de red, entradas y paquetes son eventos del sistema; las de red se registran solo mientras Inicio está visible. El servicio de botones del mando es opcional y viene desactivado. Favoritos y aplicaciones ocultas se guardan en preferencias locales de la TV; el manifiesto desactiva la copia de seguridad de la aplicación y define exclusiones de transferencia. La CI rechaza cualquier permiso fuera de esa lista cerrada. Esto no controla el tráfico de otras aplicaciones instaladas ni demuestra que el firmware carezca de telemetría. `launcher/app/src/main/res/values/config.xml` proporciona favoritos iniciales; un tema (`tools/theme.py`) los sustituye sin recompilar, y las decisiones hechas con el mando prevalecen.
 
 La cuadrícula consulta actividades iniciables `LEANBACK_LAUNCHER` y `LAUNCHER`: muestra una entrada por paquete y prioriza la entrada para TV. No enumera servicios sin interfaz. Ocultar una app en esta pantalla solo modifica la vista; para desactivar un paquete se utiliza la herramienta ADB con su respaldo.
+
+## Después de una actualización de firmware
+
+Una actualización puede reactivar paquetes. `verify` lo detecta sin cambiar nada; `verify --fix` vuelve a desactivar lo que la actualización reactivó, con las mismas protecciones que la primera vez (HOME, teclados, entradas, accesibilidad, VPN y la red Wi-Fi guardada), y registra la reparación en el mismo respaldo. `restore` sigue devolviendo la TV a su estado anterior al primer cambio.
+
+```bash
+python tools/debloat.py verify backups/operacion-nueva.json
+python tools/debloat.py verify --fix backups/operacion-nueva.json
+```
+
+Un paquete que tras la actualización pasó a ser HOME, teclado o entrada se deja activo y se informa para revisarlo a mano (código de salida 1).
 
 ## Revisar, aplicar y restaurar
 
@@ -236,7 +255,8 @@ Las pruebas cubren claves reales, salida de comandos, simulación, estados origi
 
 - `tools/`: cliente ADB, inventario de paquetes, debloat/restauración y activación/restauración de HOME.
 - `tests/`: regresiones sin dispositivo.
-- `examples/`: listas orientativas por fabricante.
+- `examples/`: listas por modelo (más de 150 televisores y reproductores, con notas de cada unidad) y orientativas por fabricante.
+- `themes/`: temas de ejemplo para `tools/theme.py`.
 - `launcher/`: proyecto Android, código del lanzador y scripts de compilación e instalación.
 - `docs/DISENO.md`: decisiones, compatibilidad y pruebas pendientes.
 - `PROMPT.md`: guía para trabajar con un agente sobre una TV.

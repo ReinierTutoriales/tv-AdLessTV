@@ -94,6 +94,55 @@ public class HomeUiTest {
         }
     }
 
+    @Test public void pushedThemeOverlaysDefaultsAndGlassFollowsFocus() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        java.io.File dir = new java.io.File(HomeConfig.deviceStorage(context), HomeConfig.THEME_DIR);
+        java.io.File config = new java.io.File(dir, HomeConfig.CONFIG);
+        assertTrue(dir.isDirectory() || dir.mkdirs());
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(config)) {
+            out.write(("{\"background_color\": \"#112233\", \"greeting_name\": \"Prueba\","
+                    + " \"columns\": \"no es un número\", \"unknown_key\": true}").getBytes("UTF-8"));
+        }
+        AppRepository preferences = new AppRepository(context);
+        preferences.followTheme();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+            waitForCatalog(scenario);
+            scenario.onActivity(activity -> {
+                assertEquals("Theme colour replaces the palette", 0xFF112233,
+                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
+                                .getBackground()).getColor());
+                assertEquals("A wrongly typed key is ignored", 0, new AppRepository(activity).columns());
+                android.widget.TextView greeting = activity.findViewById(R.id.greeting);
+                if (activity.getResources().getDisplayMetrics().heightPixels >= AppAdapter.dp(activity, 500)) {
+                    assertTrue(greeting.getText().toString().contains("Prueba"));
+                }
+            });
+            waitUntil(scenario, activity -> {
+                View focus = activity.getCurrentFocus();
+                View glass = activity.findViewById(R.id.glass);
+                if (!(focus instanceof AppAdapter.Tile) || glass.getVisibility() != View.VISIBLE) return false;
+                Rect tile = new Rect(), highlight = new Rect();
+                focus.getGlobalVisibleRect(tile);
+                glass.getGlobalVisibleRect(highlight);
+                return Math.abs(tile.centerX() - highlight.centerX()) <= AppAdapter.dp(activity, 3)
+                        && Math.abs(tile.centerY() - highlight.centerY()) <= AppAdapter.dp(activity, 3);
+            });
+            screenshot("theme-glass.png");
+        } finally {
+            assertTrue(config.delete());
+            preferences.followTheme();
+        }
+    }
+
+    @Test public void themeProviderRefusesFilesOutsideTheTheme() {
+        Context context = instrumentation.getTargetContext();
+        try {
+            context.getContentResolver().openFileDescriptor(
+                    android.net.Uri.parse("content://com.adlesstv.launcher.theme/../shared_prefs/x.xml"), "w");
+            fail("Only config.json and wallpaper.jpg may be written");
+        } catch (java.io.FileNotFoundException | SecurityException expected) { /* Refused. */ }
+    }
+
     @Test public void chosenColumnsApplyWhenTheCatalogOpens() throws Exception {
         Context context = instrumentation.getTargetContext();
         AppRepository preferences = new AppRepository(context);
