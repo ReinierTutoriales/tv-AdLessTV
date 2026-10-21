@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">AdLessTV</string>
     <string name="favorites">Favorites</string>
     <string name="all_apps">All apps</string>
@@ -19,7 +19,6 @@
     <string name="launch_failed">The app could not be opened.</string>
     <string name="action_unavailable">This option is unavailable on this TV.</string>
     <string name="clock_dream">AdLessTV clock</string>
-    <string name="dream_hint">Enable the screensaver in your TV settings.</string>
     <string name="long_press_hint">Hold OK or press Menu to organize apps</string>
     <string name="loading_apps">Loading apps…</string>
     <string name="scan_failed">Unable to read apps. Reopen home to try again.</string>
@@ -36,4 +35,16 @@
     <string name="theme_night">Night</string>
     <string name="theme_ocean">Ocean</string>
     <string name="theme_warm">Warm</string>
+    <string name="input_connected">Connected</string>
+    <string name="input_standby">Standby</string>
+    <string name="input_disconnected">No signal</string>
+    <string name="input_description">%1$s · %2$s</string>
+    <string name="memory_free">%1$s free of %2$s</string>
+    <string name="memory_show">Show free memory</string>
+    <string name="memory_hide">Hide free memory</string>
+    <string name="original_home">Return to the original launcher</string>
+    <string name="original_home_opened">Original launcher opened. If Home still returns to AdLessTV, change the home app in Settings.</string>
+    <string name="original_home_missing" tools:ignore="TypographyDashes">No other launcher is enabled. If the factory launcher was disabled, restore it from the computer with tools/home.py --restore and the HOME backup.</string>
+    <string name="columns">Apps per row</string>
+    <string name="columns_auto">Automatic</string>
 </resources>

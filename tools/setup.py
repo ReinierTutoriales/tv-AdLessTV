@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unified, reversible Android TV setup and recovery entry point."""
+"""Punto de entrada unificado y reversible para configurar y recuperar la TV."""
 
 import argparse
 import json
@@ -24,30 +24,30 @@ def main(argv=None):
     actions.add_argument("--debloat-apply", metavar="PROFILE_JSON")
     actions.add_argument("--debloat-verify", metavar="BACKUP_JSON")
     actions.add_argument("--debloat-restore", metavar="BACKUP_JSON")
-    parser.add_argument("--debloat-backup", metavar="NEW_BACKUP_JSON", help="Required with --debloat-apply")
-    parser.add_argument("--stock-package", help="Exact OEM HOME package, only with --activate")
+    parser.add_argument("--debloat-backup", metavar="NEW_BACKUP_JSON", help="Obligatorio con --debloat-apply")
+    parser.add_argument("--stock-package", help="Paquete HOME de fábrica exacto; solo con --activate")
     args = parser.parse_args(argv)
     if args.debloat_apply and not args.debloat_backup:
-        parser.error("--debloat-apply requires --debloat-backup")
+        parser.error("--debloat-apply requiere --debloat-backup")
     if args.debloat_backup and not args.debloat_apply:
-        parser.error("--debloat-backup requires --debloat-apply")
+        parser.error("--debloat-backup requiere --debloat-apply")
     if args.debloat_backup and Path(args.debloat_backup).exists():
-        parser.error("Debloat backup already exists; choose a new path.")
+        parser.error("El respaldo de debloat ya existe; usa una ruta nueva.")
     if args.stock_package and not args.activate:
-        parser.error("--stock-package requires --activate")
+        parser.error("--stock-package requiere --activate")
     if args.activate and Path(args.activate).exists():
-        parser.error("Backup already exists; choose a new path.")
+        parser.error("El respaldo ya existe; usa una ruta nueva.")
     device = None
     try:
         device = connect(args.host, args.port)
         home.require_user_zero(device)
         if args.inspect:
-            print("Device:", home.identity(device))
+            print("TV:", home.identity(device))
             print("HOME:", home.current_home(device))
-            print("HOME candidates:")
+            print("Actividades HOME habilitadas:")
             for candidate in sorted(home.home_claimants(device)):
                 print(" ", candidate)
-            print("Launcher APK:", shell(device, "pm path com.adlesstv.launcher").strip())
+            print("APK de AdLessTV:", shell(device, "pm path com.adlesstv.launcher || true").strip() or "no instalado")
         elif args.debloat_plan or args.debloat_apply:
             profile = debloat.read_profile(Path(args.debloat_plan or args.debloat_apply))
             debloat.check_profile(device, profile)
@@ -58,7 +58,7 @@ def main(argv=None):
             if args.debloat_apply:
                 debloat.apply(device, snapshot, Path(args.debloat_backup))
             else:
-                print("Dry run only. No packages changed.")
+                print("Solo simulación. No se cambió ningún paquete.")
         elif args.debloat_verify or args.debloat_restore:
             path = Path(args.debloat_verify or args.debloat_restore)
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -69,7 +69,7 @@ def main(argv=None):
                 debloat.restore(device, data, path)
         elif args.activate:
             home.activate(device, args.activate, args.stock_package)
-            print("Next: reboot the TV, then run --verify-reboot with the same backup.")
+            print("Siguiente: reinicia la TV y ejecuta --verify-reboot con el mismo respaldo.")
         elif args.verify_reboot:
             home.verify_reboot(device, args.verify_reboot)
         else:

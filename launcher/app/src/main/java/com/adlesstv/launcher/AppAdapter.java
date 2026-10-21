@@ -63,10 +63,19 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     void replace(List<AppRepository.App> favorites, List<AppRepository.App> apps) {
+        replace(favorites, apps, java.util.Collections.emptyList());
+    }
+
+    /** Inputs come first: a short row of real HDMI/AV/tuner sources that never needs scrolling. */
+    void replace(List<AppRepository.App> favorites, List<AppRepository.App> apps, List<AppRepository.App> inputs) {
         List<Entry> next = new ArrayList<>();
         if (!favorites.isEmpty()) {
             if (!dock) next.add(new Entry(null, R.string.favorites, 0));
             for (AppRepository.App app : favorites) next.add(new Entry(app, 0, artwork.revision()));
+        }
+        if (!inputs.isEmpty()) {
+            next.add(new Entry(null, R.string.inputs, 0));
+            for (AppRepository.App input : inputs) next.add(new Entry(input, 0, artwork.revision()));
         }
         if (!apps.isEmpty()) {
             next.add(new Entry(null, R.string.all_apps, 0));
@@ -83,9 +92,10 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 AppRepository.App old = previous.get(oldPosition).app;
                 AppRepository.App now = next.get(newPosition).app;
                 if (old == null || now == null) return old == now;
-                return previous.get(oldPosition).artworkRevision == next.get(newPosition).artworkRevision
-                        && old.label.equals(now.label) && Objects.equals(
-                        old.info.activityInfo.applicationInfo.sourceDir,
+                if (previous.get(oldPosition).artworkRevision != next.get(newPosition).artworkRevision
+                        || !old.label.equals(now.label) || old.isInput() != now.isInput()) return false;
+                if (old.isInput()) return old.inputState == now.inputState;
+                return Objects.equals(old.info.activityInfo.applicationInfo.sourceDir,
                         now.info.activityInfo.applicationInfo.sourceDir);
             }
         });
@@ -153,7 +163,10 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         Holder holder = (Holder) base;
         AppRepository.App app = entry.app;
         holder.tile.label.setText(app.label);
-        holder.tile.setContentDescription(app.label);
+        holder.tile.setContentDescription(app.isInput() ? context.getString(R.string.input_description,
+                app.label, context.getString(InputStates.label(app.inputState))) : app.label);
+        holder.tile.setAlpha(app.isInput() && app.inputState == android.media.tv.TvInputManager.INPUT_STATE_DISCONNECTED
+                ? 0.62f : 1f);
         artwork.bind(holder.tile.icon, app);
         holder.tile.setOnClickListener(v -> listener.opened(app));
         holder.tile.setOnLongClickListener(v -> { listener.options(app); return true; });

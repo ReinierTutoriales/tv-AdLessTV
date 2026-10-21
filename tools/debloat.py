@@ -174,12 +174,23 @@ def plan(dev, packages):
     blocked = set(packages) & protected
     if blocked:
         raise ValueError("Paquetes protegidos (HOME, teclado o sistema): " + ", ".join(sorted(blocked)))
-    # Completar toda la lectura antes de permitir el primer cambio.
+    # Completar toda la lectura antes de permitir el primer cambio. Se informan todos los
+    # paquetes ausentes de una vez: una lista con nombres erróneos se corrige en una sola pasada.
+    entries, missing = [], []
+    for package in packages:
+        try:
+            entries.append({"package": package, "state": package_state(dev, package), "status": "not_started"})
+        except ValueError as exc:
+            if "no está instalado" not in str(exc):
+                raise
+            missing.append(package)
+    if missing:
+        raise ValueError("No están instalados para el usuario 0 (revisa la lista; no se cambió nada): "
+                         + ", ".join(missing))
     return {"version": 1, "user": 0, "device": identity(dev),
             "firmware": firmware,
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "packages": [{"package": p, "state": package_state(dev, p), "status": "not_started"}
-                         for p in packages]}
+            "packages": entries}
 
 
 def apply(dev, snapshot, path):

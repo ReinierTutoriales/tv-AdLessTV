@@ -1,6 +1,7 @@
 package com.adlesstv.launcher;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.app.role.RoleManager;
 import android.annotation.SuppressLint;
@@ -21,6 +22,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.text.format.Formatter;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -52,6 +54,17 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<AppRepository.App> all = new ArrayList<>();
     private final List<AppRepository.App> pinned = new ArrayList<>();
+    private final List<AppRepository.App> tvInputs = new ArrayList<>();
+    // Event-driven: the framework calls back when an input appears, disappears or changes state.
+    private final TvInputManager.TvInputCallback inputChanges = new TvInputManager.TvInputCallback() {
+        @Override public void onInputAdded(String inputId) { inputsChanged(); }
+        @Override public void onInputRemoved(String inputId) { inputsChanged(); }
+        @Override public void onInputUpdated(String inputId) { inputsChanged(); }
+        @Override public void onInputStateChanged(String inputId, int state) { inputsChanged(); }
+    };
+    private TvInputManager inputManager;
+    private TextView memory;
+    private int heroAccent = Integer.MIN_VALUE;
     private final BroadcastReceiver packageChanges = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             dirty = true;
@@ -82,6 +95,10 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private View heroOpen;
     private View heroInfo;
     private TextView heroName;
+    private TextView heroHint;
+    private View heroActions;
+    private View hero;
+    private int heroMinHeight;
     private AppRepository.App selectedApp;
     private String lastFocused;
     private boolean resumed;
@@ -122,14 +139,24 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         heroOpen = findViewById(R.id.hero_open);
         heroInfo = findViewById(R.id.hero_info);
         heroName = findViewById(R.id.hero_name);
+        heroHint = findViewById(R.id.hero_hint);
+        heroActions = findViewById(R.id.hero_actions);
+        hero = findViewById(R.id.hero);
+        heroMinHeight = hero.getMinimumHeight();
+        memory = findViewById(R.id.memory);
         if (getResources().getDisplayMetrics().heightPixels < AppAdapter.dp(this, 500)) {
             findViewById(R.id.date).setVisibility(View.GONE);
-            findViewById(R.id.hero_hint).setVisibility(View.GONE);
+            memory.setVisibility(View.GONE);
+            memory = null;
+            heroHint.setVisibility(View.GONE);
+            heroHint = null;
             findViewById(R.id.top_bar).setMinimumHeight(AppAdapter.dp(this, 52));
             heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 23);
         }
         heroOpen.setOnClickListener(v -> { if (selectedApp != null) openApp(selectedApp); });
-        heroInfo.setOnClickListener(v -> { if (selectedApp != null) openAppDetails(selectedApp); });
+        heroInfo.setOnClickListener(v -> {
+            if (selectedApp != null && !selectedApp.isInput()) openAppDetails(selectedApp);
+        });
         heroOpen.setOnKeyListener((v, key, event) -> heroKey(key, event));
         heroInfo.setOnKeyListener((v, key, event) -> heroKey(key, event));
         if (Build.VERSION.SDK_INT >= 33) {
@@ -161,16 +188,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         grid.setAdapter(adapter);
         grid.setItemAnimator(null);
         grid.getViewTreeObserver().addOnGlobalLayoutListener(this::applyPendingFocus);
-        grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            int available = right - left - grid.getPaddingLeft() - grid.getPaddingRight();
-            int columns = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 120)));
-            if (columns != layout.getSpanCount()) {
-                layout.setSpanCount(columns);
-                adapter.setColumns(columns);
-                int selected = adapter.indexOf(lastFocused);
-                if (selected >= 0) focusGrid(selected);
-            }
-        });
+        grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                applyColumns(right - left - grid.getPaddingLeft() - grid.getPaddingRight()));
         inputs.setOnClickListener(v -> showInputs());
         settings.setOnClickListener(v -> showSettings());
         network.setOnClickListener(v -> openSettings(Settings.ACTION_WIFI_SETTINGS));
@@ -203,6 +222,11 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         packages.addDataScheme("package");
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(packageChanges, packages, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(packageChanges, packages);
+        inputManager = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
+        if (inputManager != null) {
+            try { inputManager.registerCallback(inputChanges, main); }
+            catch (RuntimeException unavailable) { inputManager = null; }
+        }
         if (Build.VERSION.SDK_INT >= 24) {
             IntentFilter unlock = new IntentFilter(Intent.ACTION_USER_UNLOCKED);
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(userUnlocked, unlock, Context.RECEIVER_NOT_EXPORTED);
@@ -230,7 +254,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
-        updateInputsVisibility();
+        updateMemory();
         if (dirty) refresh();
     }
 
@@ -246,14 +270,21 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         super.onSaveInstanceState(state);
     }
 
+    @SuppressWarnings("deprecation") // RUNNING_* levels are still delivered before API 34.
     @Override public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && artwork != null) artwork.trim();
+        if (artwork == null) return;
+        boolean critical = level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+                || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
+                || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL;
+        // Opening an app hides Home: keep half the artwork so returning does not redraw every tile.
+        if (critical || level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) artwork.trim(critical);
     }
 
     @Override protected void onDestroy() {
         destroyed = true;
         unregisterReceiver(packageChanges);
+        if (inputManager != null) inputManager.unregisterCallback(inputChanges);
         if (Build.VERSION.SDK_INT >= 24) unregisterReceiver(userUnlocked);
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
@@ -270,7 +301,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         dirty = false;
         scanner.execute(() -> {
             List<AppRepository.App> next;
-            try { next = repository.scan(); }
+            List<AppRepository.App> inputs;
+            try { next = repository.scan(); inputs = repository.scanInputs(); }
             catch (RuntimeException failure) {
                 main.post(() -> {
                     if (destroyed) return;
@@ -286,6 +318,9 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                 if (!resumed) { dirty = true; return; }
                 all.clear();
                 all.addAll(next);
+                tvInputs.clear();
+                tvInputs.addAll(inputs);
+                updateInputsVisibility();
                 render();
                 if (dirty) refresh();
             });
@@ -310,7 +345,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         }
         dockAdapter.replace(pinned, Collections.emptyList());
         dock.setVisibility(pinned.isEmpty() ? View.GONE : View.VISIBLE);
-        adapter.replace(Collections.emptyList(), rest);
+        adapter.replace(Collections.emptyList(), rest, tvInputs);
         selectedApp = null;
         int inDock = dockAdapter.indexOf(lastFocused);
         int inGrid = adapter.indexOf(lastFocused);
@@ -323,6 +358,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         boolean noApps = adapter.firstApp() < 0 && dockAdapter.firstApp() < 0;
         empty.setVisibility(noApps ? View.VISIBLE : View.GONE);
         if (noApps) {
+            setCatalogMode(false);
             catalogContainer.animate().cancel();
             catalogContainer.setAlpha(1f);
             catalogContainer.setTranslationY(0f);
@@ -341,7 +377,49 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         }
     }
 
+    /**
+     * The hero buttons are reachable only from the dock (Up). While the catalog is open they
+     * would just take rows away from the grid, which matters at 720 x 480 with large text.
+     */
+    private void setCatalogMode(boolean open) {
+        int visibility = open ? View.GONE : View.VISIBLE;
+        if (heroActions.getVisibility() != visibility) heroActions.setVisibility(visibility);
+        if (heroHint != null && heroHint.getVisibility() != visibility) heroHint.setVisibility(visibility);
+        int minimum = open ? 0 : heroMinHeight;
+        if (hero.getMinimumHeight() != minimum) hero.setMinimumHeight(minimum);
+        // The grid slides up over the dock; Up from its first row brings the dock back.
+        int dockVisibility = open || dockAdapter.firstApp() < 0 ? View.GONE : View.VISIBLE;
+        if (dock.getVisibility() != dockVisibility) dock.setVisibility(dockVisibility);
+    }
+
+    /** Width-adaptive by default; a chosen count is honoured while tiles stay at least 88 dp wide. */
+    private void applyColumns(int available) {
+        if (available <= 0) return;
+        int automatic = Math.max(2, Math.min(6, available / AppAdapter.dp(this, 120)));
+        int chosen = repository.columns();
+        int widest = Math.max(2, available / AppAdapter.dp(this, 88));
+        int columns = chosen > 0 ? Math.min(chosen, widest) : automatic;
+        if (columns == layout.getSpanCount()) return;
+        layout.setSpanCount(columns);
+        adapter.setColumns(columns);
+        int selected = adapter.indexOf(lastFocused);
+        if (selected >= 0 && catalogContainer.getVisibility() == View.VISIBLE) focusGrid(selected);
+    }
+
+    private void showColumns() {
+        String[] labels = {getString(R.string.columns_auto), "4", "5", "6", "7"};
+        int current = repository.columns();
+        new AlertDialog.Builder(this).setTitle(R.string.columns)
+                .setSingleChoiceItems(labels, current == 0 ? 0 : current - 3, (dialog, choice) -> {
+                    repository.setColumns(choice == 0 ? 0 : choice + 3);
+                    applyColumns(grid.getWidth() - grid.getPaddingLeft() - grid.getPaddingRight());
+                    dialog.dismiss();
+                })
+                .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
     private void focusDock(int position) {
+        setCatalogMode(false);
         catalogContainer.animate().cancel();
         catalogContainer.setTranslationY(0f);
         catalogContainer.setAlpha(1f);
@@ -375,6 +453,8 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         // A newly visible RecyclerView may not have laid out its children yet;
         // applyPendingFocus completes the handoff after layout.
         boolean openingCatalog = catalogContainer.getVisibility() != View.VISIBLE;
+        // Without a dock, Up from the grid lands on the hero buttons: keep them visible then.
+        setCatalogMode(dockAdapter.firstApp() >= 0);
         catalogContainer.animate().cancel();
         idleSpacer.setVisibility(View.GONE);
         catalogContainer.setVisibility(View.VISIBLE);
@@ -455,6 +535,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
 
     private void openApp(AppRepository.App app) {
         lastFocused = app.key();
+        if (app.isInput()) { openInput(app.input); return; }
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN).setComponent(app.component);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -469,6 +550,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void showOptions(AppRepository.App app) {
+        if (app.isInput()) { showInputs(); return; }
         int pinnedIndex = -1;
         for (int i = 0; i < pinned.size(); i++) if (pinned.get(i).key().equals(app.key())) pinnedIndex = i;
         final int index = pinnedIndex;
@@ -501,24 +583,38 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void showSettings() {
-        String[] labels = {getString(R.string.show_hidden), getString(R.string.reset_favorites),
-                getString(repository.reducedMotion() ? R.string.motion_enable : R.string.motion_reduce),
-                getString(R.string.visual_theme), getString(R.string.default_home),
-                getString(R.string.clock_dream), getString(R.string.settings)};
+        List<Integer> actions = new ArrayList<>();
+        actions.add(R.string.default_home);
+        actions.add(R.string.original_home);
+        actions.add(R.string.show_hidden);
+        actions.add(R.string.reset_favorites);
+        actions.add(R.string.visual_theme);
+        actions.add(R.string.columns);
+        actions.add(repository.reducedMotion() ? R.string.motion_enable : R.string.motion_reduce);
+        actions.add(repository.showMemory() ? R.string.memory_hide : R.string.memory_show);
+        actions.add(R.string.clock_dream);
+        actions.add(R.string.settings);
+        String[] labels = new String[actions.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = getString(actions.get(i));
         new AlertDialog.Builder(this).setTitle(R.string.manage).setItems(labels, (dialog, choice) -> {
-            if (choice == 0) showHidden();
-            else if (choice == 1) new AlertDialog.Builder(this).setMessage(R.string.confirm_reset)
+            int action = actions.get(choice);
+            if (action == R.string.default_home) requestHome();
+            else if (action == R.string.original_home) showOriginalHomes();
+            else if (action == R.string.show_hidden) showHidden();
+            else if (action == R.string.reset_favorites) new AlertDialog.Builder(this).setMessage(R.string.confirm_reset)
                     .setPositiveButton(android.R.string.ok, (d, which) -> { repository.resetFavorites(); render(); })
                     .setNegativeButton(android.R.string.cancel, null).show();
-            else if (choice == 2) {
+            else if (action == R.string.visual_theme) showVisualThemes();
+            else if (action == R.string.columns) showColumns();
+            else if (action == R.string.motion_enable || action == R.string.motion_reduce) {
                 boolean reduced = !repository.reducedMotion();
                 repository.setReducedMotion(reduced);
                 adapter.setReducedMotion(reduced);
                 dockAdapter.setReducedMotion(reduced);
-            }
-            else if (choice == 3) showVisualThemes();
-            else if (choice == 4) requestHome();
-            else if (choice == 5) openSettings("android.settings.DREAM_SETTINGS");
+            } else if (action == R.string.memory_hide || action == R.string.memory_show) {
+                repository.setShowMemory(!repository.showMemory());
+                updateMemory();
+            } else if (action == R.string.clock_dream) openSettings("android.settings.DREAM_SETTINGS");
             else openSettings(Settings.ACTION_SETTINGS);
         }).show();
     }
@@ -533,6 +629,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
                             repository.setVisualTheme(choice);
                             VisualTheme.apply(this, choice, findViewById(R.id.root),
                                     findViewById(R.id.hero), dock);
+                            heroAccent = Integer.MIN_VALUE;
                             updateHero();
                             dialog.dismiss();
                         })
@@ -578,50 +675,100 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     }
 
     private void showInputs() {
-        TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
-        List<TvInputInfo> available = tim == null ? new ArrayList<>() : tim.getTvInputList();
-        List<TvInputInfo> inputsFound = new ArrayList<>();
-        for (TvInputInfo info : available) {
-            if (info.isPassthroughInput() || info.getType() == TvInputInfo.TYPE_TUNER) inputsFound.add(info);
-        }
-        if (inputsFound.isEmpty()) { toast(R.string.no_inputs); openSettings(Settings.ACTION_SETTINGS); return; }
+        if (tvInputs.isEmpty()) { toast(R.string.no_inputs); openSettings(Settings.ACTION_SETTINGS); return; }
+        List<AppRepository.App> inputsFound = new ArrayList<>(tvInputs);
         String[] labels = new String[inputsFound.size()];
         for (int i = 0; i < labels.length; i++) {
-            TvInputInfo input = inputsFound.get(i);
-            CharSequence label = input.loadLabel(this);
-            labels[i] = label == null ? input.getId() : label.toString();
+            AppRepository.App input = inputsFound.get(i);
+            labels[i] = getString(R.string.input_description, input.label,
+                    getString(InputStates.label(input.inputState)));
         }
-        new AlertDialog.Builder(this).setTitle(R.string.inputs).setItems(labels, (dialog, index) -> {
-            TvInputInfo choice = inputsFound.get(index);
-            if (choice.isPassthroughInput()) {
-                Intent view = new Intent(Intent.ACTION_VIEW).setDataAndType(
-                        TvContract.buildChannelUriForPassthroughInput(choice.getId()),
-                        "vnd.android.cursor.item/channel");
-                try { startActivity(view); } catch (RuntimeException e) { toast(R.string.action_unavailable); }
-            } else {
-                Intent live = getPackageManager().getLaunchIntentForPackage(
-                        choice.getServiceInfo().packageName);
-                if (live != null) {
-                    try { startActivity(live); }
-                    catch (RuntimeException e) { openSettings(Settings.ACTION_SETTINGS); }
-                } else openSettings(Settings.ACTION_SETTINGS);
-            }
-        }).show();
+        new AlertDialog.Builder(this).setTitle(R.string.inputs).setItems(labels,
+                (dialog, index) -> openInput(inputsFound.get(index).input)).show();
+    }
+
+    private void openInput(TvInputInfo choice) {
+        if (choice.isPassthroughInput()) {
+            Intent view = new Intent(Intent.ACTION_VIEW).setDataAndType(
+                    TvContract.buildChannelUriForPassthroughInput(choice.getId()),
+                    "vnd.android.cursor.item/channel");
+            try { startActivity(view); } catch (RuntimeException e) { toast(R.string.action_unavailable); }
+            return;
+        }
+        Intent live = getPackageManager().getLaunchIntentForPackage(choice.getServiceInfo().packageName);
+        if (live == null) live = getPackageManager().getLeanbackLaunchIntentForPackage(
+                choice.getServiceInfo().packageName);
+        if (live != null) {
+            try { startActivity(live); return; }
+            catch (RuntimeException ignored) { /* Fall back to the settings below. */ }
+        }
+        openSettings(Settings.ACTION_SETTINGS);
+    }
+
+    private void inputsChanged() {
+        dirty = true;
+        if (resumed) refresh();
     }
 
     private void updateInputsVisibility() {
-        TvInputManager manager = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
-        boolean hasInput = false;
-        if (manager != null) {
-            for (TvInputInfo info : manager.getTvInputList()) {
-                if (info.isPassthroughInput() || info.getType() == TvInputInfo.TYPE_TUNER) {
-                    hasInput = true;
-                    break;
-                }
-            }
-        }
+        boolean hasInput = !tvInputs.isEmpty();
         if (!hasInput && inputs.hasFocus()) network.requestFocus();
         inputs.setVisibility(hasInput ? View.VISIBLE : View.GONE);
+    }
+
+    /** One Binder read per resume; Home never polls. Shows the system figure, nothing estimated. */
+    private void updateMemory() {
+        if (memory == null) return;
+        if (!repository.showMemory()) { memory.setVisibility(View.GONE); return; }
+        ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (manager == null) { memory.setVisibility(View.GONE); return; }
+        ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
+        manager.getMemoryInfo(info);
+        memory.setText(getString(R.string.memory_free, Formatter.formatShortFileSize(this, info.availMem),
+                Formatter.formatShortFileSize(this, info.totalMem)));
+        memory.setTextColor(info.lowMemory ? 0xFFFFC27A : 0xFFA2A9B6);
+        memory.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Escape hatch without a computer: open another enabled launcher. Before Android 10 this also
+     * clears AdLessTV as preferred Home, so the next Home press asks which launcher to use.
+     */
+    private void showOriginalHomes() {
+        Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        List<ResolveInfo> found = getPackageManager().queryIntentActivities(query, 0);
+        List<ResolveInfo> others = new ArrayList<>();
+        for (ResolveInfo info : found) {
+            if (info.activityInfo == null || getPackageName().equals(info.activityInfo.packageName)) continue;
+            if (info.activityInfo.name.endsWith(".FallbackHome")) continue;
+            others.add(info);
+        }
+        if (others.isEmpty()) {
+            new AlertDialog.Builder(this).setMessage(R.string.original_home_missing)
+                    .setPositiveButton(android.R.string.ok, null).show();
+            return;
+        }
+        String[] labels = new String[others.size()];
+        for (int i = 0; i < labels.length; i++) {
+            CharSequence label = others.get(i).loadLabel(getPackageManager());
+            labels[i] = label == null ? others.get(i).activityInfo.packageName : label.toString();
+        }
+        new AlertDialog.Builder(this).setTitle(R.string.original_home).setItems(labels, (dialog, index) -> {
+            ResolveInfo choice = others.get(index);
+            releaseHome();
+            try {
+                startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                        .setClassName(choice.activityInfo.packageName, choice.activityInfo.name)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                toast(R.string.original_home_opened);
+            } catch (RuntimeException e) { toast(R.string.action_unavailable); }
+        }).show();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void releaseHome() {
+        // An app may clear only its own preferred activities; Android 10+ manages HOME as a role.
+        if (Build.VERSION.SDK_INT < 29) getPackageManager().clearPackagePreferredActivities(getPackageName());
     }
 
     private View firstTopAction() { return inputs.getVisibility() == View.VISIBLE ? inputs : network; }
@@ -638,9 +785,14 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
     private void updateHero() {
         heroName.setText(selectedApp == null ? getString(R.string.app_name) : selectedApp.label);
         heroOpen.setEnabled(selectedApp != null);
-        heroInfo.setEnabled(selectedApp != null);
-        VisualTheme.applyAccent(this, repository.visualTheme(), findViewById(R.id.hero),
-                selectedApp == null ? 0 : artwork.accent(selectedApp));
+        heroInfo.setEnabled(selectedApp != null && !selectedApp.isInput());
+        heroInfo.setFocusable(heroInfo.isEnabled());
+        if (heroHint != null) heroHint.setText(selectedApp != null && selectedApp.isInput()
+                ? getString(InputStates.label(selectedApp.inputState)) : getString(R.string.long_press_hint));
+        int accent = selectedApp == null ? 0 : artwork.accent(selectedApp);
+        if (accent == heroAccent) return;
+        heroAccent = accent;
+        VisualTheme.applyAccent(this, repository.visualTheme(), findViewById(R.id.hero), accent);
     }
 
     private boolean heroKey(int key, KeyEvent event) {
@@ -656,7 +808,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
             boolean towardsInfo = key == KeyEvent.KEYCODE_DPAD_RIGHT;
             if (getWindow().getDecorView().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL)
                 towardsInfo = !towardsInfo;
-            (towardsInfo ? heroInfo : heroOpen).requestFocus();
+            (towardsInfo && heroInfo.isEnabled() ? heroInfo : heroOpen).requestFocus();
             return true;
         }
         return false;
@@ -690,6 +842,7 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         } else if (dockAdapter.firstApp() >= 0) {
             focusDock(dockAdapter.firstApp());
         } else {
+            setCatalogMode(false);
             catalogContainer.setVisibility(View.GONE);
             idleSpacer.setVisibility(View.VISIBLE);
             settings.requestFocus();

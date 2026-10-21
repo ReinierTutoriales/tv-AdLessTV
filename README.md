@@ -12,8 +12,14 @@ Lanzador ligero para Android TV / Google TV y herramientas ADB para revisar apli
 - Mantener OK o pulsar Menú sobre una app para añadir/quitar favorito, moverlo a izquierda o derecha u ocultarla; ajustes del lanzador para recuperar apps ocultas y restablecer favoritos.
 - Tres paletas visuales opacas (Noche, Océano y Cálido) en Personalizar. Se guardan solo en la TV y cambian sin red, fondos animados ni servicios permanentes.
 - La cabecera toma un acento suave del arte local de la app enfocada. Se calcula al cargar la miniatura en segundo plano y comparte su caché acotada.
+- Carátulas decodificadas a densidad xhdpi (banners) y xxhdpi (iconos) aunque la TV use mdpi o tvdpi, para que no se vean borrosas; un solo hilo de decodificación en equipos de poca RAM, y al abrir una app se conserva la mitad de la caché para volver a Inicio sin redibujar todo.
 - Recuperación del foco por identidad al volver de una aplicación, sin volver a consultar todos los paquetes ni reconstruir el inicio.
-- Accesos a entradas, ajustes de Wi-Fi y ajustes del sistema; salvapantallas de reloj opcional.
+- Fila **Entradas** con las fuentes reales que expone Android (HDMI, AV, sintonizador), con el nombre personalizado de los ajustes de la TV y su estado (conectada, en espera, sin señal). Se actualiza por eventos del sistema, sin sondeo; en un stick sin entradas no aparece.
+- Memoria libre del sistema junto a la fecha (dato de `ActivityManager`, leído al volver a Inicio; nunca se sondea). Se oculta desde Personalizar.
+- **Volver al lanzador original** desde Personalizar, sin ordenador: abre otro lanzador habilitado y, antes de Android 10, retira la preferencia de AdLessTV para que Inicio pregunte de nuevo. Si el lanzador de fábrica se desactivó, indica cómo restaurarlo con el respaldo HOME.
+- Al pulsar Abajo desde los favoritos, la cuadrícula sube sobre el dock y la cabecera se reduce al nombre de la app enfocada; Arriba desde la primera fila devuelve el dock. Así caben más filas a 720 × 480 o con texto ampliado.
+- Aplicaciones por fila desde Personalizar: Automático (según el ancho) o 4–7, con un mínimo de 88 dp por tarjeta.
+- Accesos a entradas, ajustes de Wi-Fi y ajustes del sistema; salvapantallas de reloj opcional con hora y fecha que cambia de esquina cada minuto para evitar marcas en el panel.
 - Conexión ADB desde Python, sin instalar el ejecutable `adb`.
 - Comandos y lotes con comprobación de salida: se detienen ante el primer fallo.
 - Envío y recepción de archivos mediante `--push` y `--pull`.
@@ -78,6 +84,8 @@ PYTHON=.venv/bin/python bash launcher/build-and-install.sh
 ```powershell
 .\launcher\build-and-install.ps1 -TvHost 192.168.1.50 -Python .\.venv\Scripts\python.exe
 ```
+
+Antes de transferir nada, el script lee la versión de Android de la TV y comprueba que declare `android.software.leanback`; si la API es inferior a la mínima del APK o no es una TV, se detiene sin tocarla. Si la versión instalada está firmada con otra clave (otro ordenador genera otra clave de depuración), la instalación falla con una explicación y **no se desinstala nada automáticamente**: si AdLessTV es HOME, restaura antes el HOME anterior.
 
 Para instalar y elegir HOME en una sola operación explícita, usa `--make-home backups/home-tv.json` en Bash o `-HomeSnapshot backups/home-tv.json` en PowerShell. El respaldo debe ser nuevo. Añade `--replace-stock <paquete-exacto>` o `-ReplaceStock <paquete-exacto>` solo tras revisar las otras funciones de ese paquete. Conserva el JSON y utiliza `tools/home.py --restore` para recuperar el inicio anterior.
 
@@ -224,7 +232,7 @@ python -m pip install -r tools/requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Las pruebas cubren claves reales, salida de comandos, simulación, estados originales, paquetes protegidos y recuperación tras fallos con una TV simulada. No sustituyen la validación en un televisor físico. La CI ejecuta Python 3.11 y 3.13 en Linux y Windows, compila los APK debug/release y prueba el recorrido de filas. La tarea de interfaz ejecuta pulsaciones reales y guarda capturas en un emulador Android a 960 × 540 dp y 720 × 480 dp con texto ampliado. El catálogo largo de esas pruebas es una fixture, no aplicaciones descargadas ni una captura de una TV física.
+Las pruebas cubren claves reales, salida de comandos, simulación, estados originales, paquetes protegidos y recuperación tras fallos con una TV simulada. No sustituyen la validación en un televisor físico. La CI ejecuta Python 3.11 y 3.14 en Linux y Windows, compila los APK debug/release contra API 37 (`targetSdk` 36) y prueba el recorrido de filas. La tarea de interfaz ejecuta pulsaciones reales y guarda capturas a 960 × 540 dp y 720 × 480 dp con texto ampliado en Android TV 14 x86 con 2 GB de RAM (perfil de stick económico) y Android TV 16 x86_64 con 2 GB; Android 17 se ejecuta como comprobación informativa (no hay imagen TV publicada y la imagen de CI aún es inestable). Las acciones de CI están fijadas por SHA completo. El catálogo largo de esas pruebas es una fixture, no aplicaciones descargadas ni una captura de una TV física.
 
 - `tools/`: cliente ADB, inventario de paquetes, debloat/restauración y activación/restauración de HOME.
 - `tests/`: regresiones sin dispositivo.

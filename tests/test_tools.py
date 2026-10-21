@@ -329,6 +329,11 @@ class DebloatTests(unittest.TestCase):
             debloat.plan(self.dev, ['com.test.first', 'com.missing.app'])
         self.assertEqual(self.dev.writes, [])
 
+    def test_missing_packages_are_reported_together(self):
+        with self.assertRaisesRegex(ValueError, 'com.missing.one, com.missing.two'):
+            debloat.plan(self.dev, ['com.missing.one', 'com.test.first', 'com.missing.two'])
+        self.assertEqual(self.dev.writes, [])
+
     def test_roundtrip_preserves_exact_states_and_is_idempotent(self):
         original = dict(self.dev.states)
         snapshot = debloat.plan(self.dev, [p for p in original if p not in ('com.test.home', 'com.test.keyboard')])

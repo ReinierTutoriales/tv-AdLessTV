@@ -7,8 +7,6 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ResolveInfo;
 import android.os.ParcelFileDescriptor;
 import android.graphics.Rect;
-import android.media.tv.TvInputInfo;
-import android.media.tv.TvInputManager;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.View;
@@ -57,6 +55,100 @@ public class HomeUiTest {
         }
     }
 
+    @Test public void memoryLineIsRealAndTheOriginalLauncherIsReachable() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        AppRepository preferences = new AppRepository(context);
+        boolean previous = preferences.showMemory();
+        try {
+            preferences.setShowMemory(true);
+            try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class))) {
+                waitForCatalog(scenario);
+                scenario.onActivity(activity -> {
+                    android.widget.TextView memory = activity.findViewById(R.id.memory);
+                    if (activity.getResources().getDisplayMetrics().heightPixels < AppAdapter.dp(activity, 500)) {
+                        assertEquals(View.GONE, memory.getVisibility());
+                        return;
+                    }
+                    assertEquals(View.VISIBLE, memory.getVisibility());
+                    android.app.ActivityManager.MemoryInfo info = new android.app.ActivityManager.MemoryInfo();
+                    ((android.app.ActivityManager) activity.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryInfo(info);
+                    assertTrue("Memory text must show the system total", memory.getText().toString().contains(
+                            android.text.format.Formatter.formatShortFileSize(activity, info.totalMem)));
+                });
+                scenario.onActivity(activity -> activity.findViewById(R.id.action_settings).performClick());
+                instrumentation.waitForIdleSync();
+                android.view.accessibility.AccessibilityNodeInfo dialog =
+                        instrumentation.getUiAutomation().getRootInActiveWindow();
+                assertNotNull("Settings menu must open", dialog);
+                assertFalse("The original launcher must be reachable without a computer",
+                        dialog.findAccessibilityNodeInfosByText(context.getString(R.string.original_home)).isEmpty());
+                screenshot("settings-menu.png");
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+                preferences.setShowMemory(false);
+                scenario.recreate();
+                scenario.onActivity(activity -> assertEquals(View.GONE,
+                        activity.findViewById(R.id.memory).getVisibility()));
+            }
+        } finally {
+            preferences.setShowMemory(previous);
+        }
+    }
+
+    @Test public void chosenColumnsApplyWhenTheCatalogOpens() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        AppRepository preferences = new AppRepository(context);
+        int previous = preferences.columns();
+        try {
+            preferences.setColumns(4);
+            ActivityInfo info = context.getPackageManager().getActivityInfo(
+                    new ComponentName(context, MainActivity.class), 0);
+            List<AppRepository.App> fixtures = new ArrayList<>();
+            for (int i = 0; i < 12; i++) {
+                ResolveInfo resolve = new ResolveInfo();
+                resolve.activityInfo = info;
+                fixtures.add(new AppRepository.App(new ComponentName("com.adlesstv.columns" + i, ".App"),
+                        "Columna " + (i + 1), resolve));
+            }
+            try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(new Intent(context, MainActivity.class));
+                 FixedCatalog ignored = new FixedCatalog(scenario)) {
+                waitForCatalog(scenario);
+                // Installed apps may all fit in the dock; a fixture catalog makes the grid reachable.
+                scenario.onActivity(activity -> {
+                    RecyclerView dock = activity.findViewById(R.id.dock);
+                    ((AppAdapter) dock.getAdapter()).replace(fixtures.subList(0, 4), java.util.Collections.emptyList());
+                    dock.setVisibility(View.VISIBLE);
+                    ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.grid)).getAdapter())
+                            .replace(java.util.Collections.emptyList(), fixtures.subList(4, fixtures.size()));
+                });
+                waitUntil(scenario, activity -> {
+                    RecyclerView dock = activity.findViewById(R.id.dock);
+                    RecyclerView.ViewHolder first = dock.findViewHolderForAdapterPosition(0);
+                    return first != null && (first.itemView.isFocused() || first.itemView.requestFocus());
+                });
+                waitUntil(scenario, activity -> activity.hasWindowFocus());
+                AtomicBoolean open = new AtomicBoolean();
+                for (int attempt = 0; attempt < 3 && !open.get(); attempt++) {
+                    instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+                    instrumentation.waitForIdleSync();
+                    scenario.onActivity(activity -> open.set(
+                            activity.findViewById(R.id.catalog_container).getVisibility() == View.VISIBLE));
+                }
+                waitUntil(scenario, activity -> activity.findViewById(R.id.catalog_container).getVisibility() == View.VISIBLE
+                        && activity.findViewById(R.id.grid).getWidth() > 0);
+                scenario.onActivity(activity -> {
+                    RecyclerView grid = activity.findViewById(R.id.grid);
+                    int span = ((androidx.recyclerview.widget.GridLayoutManager) grid.getLayoutManager()).getSpanCount();
+                    int available = grid.getWidth() - grid.getPaddingLeft() - grid.getPaddingRight();
+                    assertEquals(Math.min(4, Math.max(2, available / AppAdapter.dp(activity, 88))), span);
+                    assertEquals("Catalog mode hides the dock", View.GONE,
+                            activity.findViewById(R.id.dock).getVisibility());
+                });
+            }
+        } finally {
+            preferences.setColumns(previous);
+        }
+    }
+
     @Test public void installedAppsAreUniqueAndFitTheViewport() throws Exception {
         Context context = instrumentation.getTargetContext();
         List<AppRepository.App> installed = new AppRepository(context).scan();
@@ -73,12 +165,8 @@ public class HomeUiTest {
             });
             scenario.onActivity(activity -> checkViewport(activity));
             scenario.onActivity(activity -> {
-                TvInputManager manager = (TvInputManager) activity.getSystemService(Context.TV_INPUT_SERVICE);
-                boolean hasInput = false;
-                if (manager != null) for (TvInputInfo input : manager.getTvInputList()) {
-                    if (input.isPassthroughInput() || input.getType() == TvInputInfo.TYPE_TUNER)
-                        hasInput = true;
-                }
+                // Same source as Home: visible, non-hidden passthrough or tuner inputs.
+                boolean hasInput = !new AppRepository(activity).scanInputs().isEmpty();
                 assertEquals("Only show a real TV input action", hasInput,
                         activity.findViewById(R.id.action_inputs).getVisibility() == View.VISIBLE);
                 RecyclerView grid = activity.findViewById(R.id.grid);
@@ -116,12 +204,20 @@ public class HomeUiTest {
                 ((AppAdapter) dock.getAdapter()).replace(fixtures.subList(0, 6), java.util.Collections.emptyList());
                 dock.setVisibility(View.VISIBLE);
                 adapter.replace(java.util.Collections.emptyList(), fixtures.subList(6, fixtures.size()));
-                grid.scrollToPosition(1);
             });
+            // The catalog stays hidden while the dock has focus; Down from the dock reveals it.
+            waitUntil(scenario, activity -> {
+                RecyclerView dock = activity.findViewById(R.id.dock);
+                RecyclerView.ViewHolder first = dock.findViewHolderForAdapterPosition(0);
+                return first != null && (first.itemView.isFocused() || first.itemView.requestFocus());
+            });
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
             waitUntil(scenario, activity -> {
                 RecyclerView grid = activity.findViewById(R.id.grid);
-                RecyclerView.ViewHolder first = grid.findViewHolderForAdapterPosition(1);
-                return first != null && first.itemView.requestFocus();
+                View focused = activity.getCurrentFocus();
+                View tile = focused == null ? null : grid.findContainingItemView(focused);
+                return grid.getScrollState() == RecyclerView.SCROLL_STATE_IDLE
+                        && tile != null && grid.getChildAdapterPosition(tile) == 1;
             });
             screenshot("fixture-grid.png");
             int[] keys = {22, 22, 22, 22, 20, 20, 20, 20, 20, 20, 20, 20,
@@ -234,22 +330,7 @@ public class HomeUiTest {
     private void checkViewport(MainActivity activity) {
         RecyclerView grid = activity.findViewById(R.id.grid);
         View root = activity.findViewById(R.id.root);
-        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
-        Rect viewport = new Rect();
-        assertTrue(grid.getGlobalVisibleRect(viewport));
-        for (int i = 0; i < grid.getChildCount(); i++) {
-            View child = grid.getChildAt(i);
-            assertTrue("Tile exceeds right column boundary", child.getRight() <= grid.getWidth());
-            assertTrue("Tile exceeds left column boundary", child.getLeft() >= 0);
-        }
         View focused = activity.getCurrentFocus();
-        View tile = focused == null ? null : grid.findContainingItemView(focused);
-        if (tile != null) {
-            int[] origin = new int[2];
-            tile.getLocationOnScreen(origin);
-            assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
-            assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
-        }
         RecyclerView dock = activity.findViewById(R.id.dock);
         View dockTile = focused == null ? null : dock.findContainingItemView(focused);
         if (dockTile != null) {
@@ -258,6 +339,26 @@ public class HomeUiTest {
             Rect bounds = new Rect();
             assertTrue(dockTile.getGlobalVisibleRect(bounds));
             assertTrue("Focused dock tile clipped", dockViewport.contains(bounds));
+        }
+        // By design the catalog is revealed only when it receives focus (Down from the dock).
+        if (activity.findViewById(R.id.catalog_container).getVisibility() != View.VISIBLE) {
+            assertNotNull("With the catalog hidden, focus must be on the dock", dockTile);
+            return;
+        }
+        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
+        Rect viewport = new Rect();
+        assertTrue(grid.getGlobalVisibleRect(viewport));
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View child = grid.getChildAt(i);
+            assertTrue("Tile exceeds right column boundary", child.getRight() <= grid.getWidth());
+            assertTrue("Tile exceeds left column boundary", child.getLeft() >= 0);
+        }
+        View tile = focused == null ? null : grid.findContainingItemView(focused);
+        if (tile != null) {
+            int[] origin = new int[2];
+            tile.getLocationOnScreen(origin);
+            assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
+            assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
         }
     }
 

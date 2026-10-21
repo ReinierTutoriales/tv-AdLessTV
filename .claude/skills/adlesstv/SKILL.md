@@ -65,6 +65,8 @@ Después de cambios importantes:
 - Inyecta teclas D-pad.
 - Saca capturas (`screencap`).
 - Antes de activar, confirma que HOME sigue abriendo el lanzador existente; después confirma que abre AdLessTV y que `tools/home.py --restore` permite regresar.
+- Sin ordenador, Personalizar → «Volver al lanzador original» abre otro HOME habilitado (antes de Android 10 retira también la preferencia de AdLessTV). No sustituye al respaldo: si se desactivó el lanzador de fábrica, solo `tools/home.py --restore` lo recupera.
+- La fila «Entradas» solo muestra fuentes que publica `TvInputManager`; verifica nombres y estado en la TV física.
 - Para cambios de código: ejecuta `python -m unittest discover -s tests -v`; no presentes pruebas simuladas como validación en TV.
 - Confirma que Inputs y apps principales siguen funcionando.
 

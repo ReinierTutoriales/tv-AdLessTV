@@ -28,6 +28,24 @@ if [[ "$BUILD_ONLY" == 1 ]]; then printf 'APK: %s\n' "$APK"; exit 0; fi
 : "${TV_HOST:?Define TV_HOST con la IP de tu TV}"
 PY="${PYTHON:-python3}"
 export MSYS_NO_PATHCONV=1
+# Preflight before touching the TV: a clear error beats a half-finished install.
+MIN_SDK=''
+if [[ -f "$ROOT/app/build.gradle" ]]; then
+  MIN_SDK="$(sed -n 's/^[[:space:]]*minSdk[[:space:]]\{1,\}\([0-9]\{1,\}\).*/\1/p' "$ROOT/app/build.gradle" | head -n 1)"
+fi
+MIN_SDK="${MIN_SDK:-23}"
+TV_SDK="$("$PY" "$ROOT/../tools/tv.py" 'getprop ro.build.version.sdk' | tr -d '\r[:space:]')" || {
+  echo 'No se pudo leer la versión de Android de la TV; no se instalará nada.' >&2; exit 1; }
+if [[ ! "$TV_SDK" =~ ^[0-9]+$ ]]; then
+  printf 'Versión de Android no reconocida (%s); no se instalará nada.\n' "$TV_SDK" >&2; exit 1
+fi
+if (( TV_SDK < MIN_SDK )); then
+  printf 'La TV tiene API %s y el lanzador requiere API %s o superior.\n' "$TV_SDK" "$MIN_SDK" >&2; exit 1
+fi
+FEATURES="$("$PY" "$ROOT/../tools/tv.py" 'pm list features')" || FEATURES=''
+if [[ "$FEATURES" != *android.software.leanback* ]]; then
+  echo 'El dispositivo no declara android.software.leanback; el lanzador es solo para Android TV.' >&2; exit 1
+fi
 cleanup_staged_apk() {
   "$PY" "$ROOT/../tools/tv.py" 'rm -f /data/local/tmp/adlesstv-preview.apk' >/dev/null 2>&1 || true
 }
@@ -43,7 +61,12 @@ fi
 cleanup_staged_apk
 trap - EXIT
 if [[ "$install_status" != 0 || "$result" != *Success* ]]; then
-  printf 'Instalación fallida: %s\n' "$result" >&2; exit 1
+  printf 'Instalación fallida: %s\n' "$result" >&2
+  if [[ "$result" == *INSTALL_FAILED_UPDATE_INCOMPATIBLE* || "$result" == *signatures* ]]; then
+    echo 'La versión instalada está firmada con otra clave. No se desinstala automáticamente:' >&2
+    echo 'si AdLessTV es HOME, restaura primero el HOME anterior con tools/home.py --restore <respaldo>.' >&2
+  fi
+  exit 1
 fi
 result="$("$PY" "$ROOT/../tools/tv.py" 'am start -W -n com.adlesstv.launcher/.MainActivity')"
 if [[ ! "$result" =~ (^|$'\n')Status:\ ok($|$'\n') || "$result" =~ (^|$'\n')Error: ]]; then

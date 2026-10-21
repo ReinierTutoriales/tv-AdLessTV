@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">AdLessTV</string>
     <string name="favorites">Favoritos</string>
     <string name="all_apps">Todas las aplicaciones</string>
@@ -19,7 +19,6 @@
     <string name="launch_failed">Esta aplicación no pudo abrirse.</string>
     <string name="action_unavailable">Esta opción no está disponible en este televisor.</string>
     <string name="clock_dream">Reloj AdLessTV</string>
-    <string name="dream_hint">El salvapantallas se activa en los ajustes del televisor.</string>
     <string name="long_press_hint">Mantén OK o pulsa Menú para organizar aplicaciones</string>
     <string name="loading_apps">Cargando aplicaciones…</string>
     <string name="scan_failed">No se pudieron leer las aplicaciones. Vuelve a abrir el inicio para reintentar.</string>
@@ -36,4 +35,16 @@
     <string name="theme_night">Noche</string>
     <string name="theme_ocean">Océano</string>
     <string name="theme_warm">Cálido</string>
+    <string name="input_connected">Conectada</string>
+    <string name="input_standby">En espera</string>
+    <string name="input_disconnected">Sin señal</string>
+    <string name="input_description">%1$s · %2$s</string>
+    <string name="memory_free">%1$s libres de %2$s</string>
+    <string name="memory_show">Mostrar memoria libre</string>
+    <string name="memory_hide">Ocultar memoria libre</string>
+    <string name="original_home">Volver al lanzador original</string>
+    <string name="original_home_opened">Lanzador original abierto. Si Inicio vuelve a AdLessTV, cambia la aplicación de inicio en Ajustes.</string>
+    <string name="original_home_missing" tools:ignore="TypographyDashes">No hay otro lanzador habilitado. Si se desactivó el de fábrica, restáuralo desde el ordenador con tools/home.py --restore y el respaldo HOME.</string>
+    <string name="columns">Aplicaciones por fila</string>
+    <string name="columns_auto">Automático</string>
 </resources>

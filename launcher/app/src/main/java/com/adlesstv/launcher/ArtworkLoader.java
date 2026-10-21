@@ -2,13 +2,19 @@ package com.adlesstv.launcher;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.util.LruCache;
 import android.widget.ImageView;
 
@@ -33,8 +39,7 @@ final class ArtworkLoader {
 
     private final Context context;
     private final Listener listener;
-    private final ThreadPoolExecutor workers = new ThreadPoolExecutor(2, 2, 0L,
-            TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    private final ThreadPoolExecutor workers;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<ImageView, Future<?>> requests = new IdentityHashMap<>();
     private final LruCache<String, Artwork> cache;
@@ -45,7 +50,11 @@ final class ArtworkLoader {
         this.context = context.getApplicationContext();
         this.listener = listener;
         ActivityManager memory = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-        int bytes = memory != null && memory.isLowRamDevice() ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
+        boolean lowRam = memory != null && memory.isLowRamDevice();
+        int bytes = lowRam ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
+        // One decoder on low-RAM sticks keeps peak heap flat; two hide latency elsewhere.
+        int threads = lowRam || Runtime.getRuntime().availableProcessors() <= 2 ? 1 : 2;
+        workers = new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
         cache = new LruCache<String, Artwork>(bytes) {
             @Override protected int sizeOf(String key, Artwork value) { return value.bitmap.getAllocationByteCount(); }
         };
@@ -101,22 +110,48 @@ final class ArtworkLoader {
         Bitmap bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.RGB_565);
         Canvas canvas = new Canvas(bitmap);
         canvas.drawColor(Color.rgb(28, 32, 40));
+        PackageManager pm = context.getPackageManager();
         Drawable art = null;
         boolean banner = false;
         try {
-            art = app.info.activityInfo.loadBanner(context.getPackageManager());
-            banner = art != null;
-            if (art == null) art = app.info.loadIcon(context.getPackageManager());
+            if (app.isInput()) {
+                if (Build.VERSION.SDK_INT >= 24) art = app.input.loadIcon(context);
+                if (art == null) art = context.getDrawable(R.drawable.ic_inputs);
+            } else {
+                ActivityInfo activity = app.info.activityInfo;
+                art = sharp(pm, activity.applicationInfo, activity.getBannerResource(), BANNER_DENSITY);
+                if (art == null) art = activity.loadBanner(pm);
+                banner = art != null;
+                if (art == null) art = sharp(pm, activity.applicationInfo, activity.getIconResource(), ICON_DENSITY);
+                if (art == null) art = app.info.loadIcon(pm);
+            }
         } catch (RuntimeException ignored) { /* Package may have been removed during this request. */ }
-        if (art == null) art = context.getPackageManager().getDefaultActivityIcon();
+        if (art == null) art = pm.getDefaultActivityIcon();
         int width = Math.max(1, art.getIntrinsicWidth()), height = Math.max(1, art.getIntrinsicHeight());
-        float scale = Math.min((banner ? WIDTH : 100f) / width, (banner ? HEIGHT : 100f) / height);
+        float box = app.isInput() ? 72f : 100f;
+        float scale = Math.min((banner ? WIDTH : box) / width, (banner ? HEIGHT : box) / height);
         int w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
         Rect old = new Rect(art.getBounds());
         art.setBounds((WIDTH - w) / 2, (HEIGHT - h) / 2, (WIDTH + w) / 2, (HEIGHT + h) / 2);
         art.draw(canvas);
         art.setBounds(old);
         return bitmap;
+    }
+
+    // A 160 x 90 dp banner is 160 x 90 px on an mdpi TV: upscaling that to 256 x 144 blurs it.
+    // Decode at a density whose pixels cover the tile instead, then let Canvas scale down.
+    private static final int BANNER_DENSITY = DisplayMetrics.DENSITY_XHIGH;
+    private static final int ICON_DENSITY = DisplayMetrics.DENSITY_XXHIGH;
+
+    private Drawable sharp(PackageManager pm, ApplicationInfo application, int resource, int density) {
+        if (resource == 0 || application == null) return null;
+        int wanted = Math.max(density, context.getResources().getDisplayMetrics().densityDpi);
+        try {
+            Resources resources = pm.getResourcesForApplication(application);
+            return resources.getDrawableForDensity(resource, wanted, null);
+        } catch (PackageManager.NameNotFoundException | RuntimeException missing) {
+            return null; // Fall back to the platform loader, which also handles odd resource tables.
+        }
     }
 
     void cancel(ImageView view) {
@@ -134,7 +169,11 @@ final class ArtworkLoader {
         for (ImageView view : new java.util.ArrayList<>(requests.keySet())) cancel(view);
         cache.evictAll();
     }
-    void trim() { cache.evictAll(); }
+    /** Keep half the tiles when Home is merely hidden; drop everything when the system is short. */
+    void trim(boolean critical) {
+        if (critical) cache.evictAll();
+        else cache.trimToSize(cache.maxSize() / 2);
+    }
 
     void close() {
         closed = true;

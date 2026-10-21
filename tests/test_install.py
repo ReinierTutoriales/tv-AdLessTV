@@ -18,13 +18,19 @@ class InstallTests(unittest.TestCase):
             launcher.mkdir()
             shutil.copy(script, launcher / script.name)
             gradle = launcher / 'gradlew'
-            gradle.write_text('#!/bin/sh\nexit 0\n')
+            # The script refuses an empty or missing APK, so the stub build produces one.
+            gradle.write_text('#!/bin/sh\nmkdir -p "$(dirname "$0")/app/build/outputs/apk/debug"\n'
+                              'printf apk > "$(dirname "$0")/app/build/outputs/apk/debug/app-debug.apk"\n')
             gradle.chmod(0o700)
             client = root / 'python-client'
             client.write_text('''#!/usr/bin/env python3
 import json, os, sys
 with open(os.environ['TEST_CAPTURE'], 'a') as stream: stream.write(json.dumps(sys.argv[1:]) + '\\n')
-if 'pm install -r /data/local/tmp/adlesstv-preview.apk' in sys.argv:
+if 'getprop ro.build.version.sdk' in sys.argv:
+ print(os.environ.get('TV_SDK', '30'))
+elif 'pm list features' in sys.argv:
+ print('feature:android.software.leanback')
+elif 'pm install -r /data/local/tmp/adlesstv-preview.apk' in sys.argv:
  print('Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]' if os.environ.get('FAIL_INSTALL') else 'Success')
 elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
  print('Status: ok')
@@ -47,6 +53,17 @@ elif 'am start -W -n com.adlesstv.launcher/.MainActivity' in sys.argv:
             self.assertIn('rm -f /data/local/tmp/adlesstv-preview.apk',
                           [arg for call in failed_calls for arg in call])
             self.assertNotIn('--activate', capture.read_text())
+            capture.unlink()
+            old_tv = subprocess.run(command, cwd=root, env={**environment, 'TV_SDK': '21'},
+                                    capture_output=True, text=True)
+            self.assertNotEqual(old_tv.returncode, 0)
+            self.assertIn('API 21', old_tv.stderr)
+            self.assertNotIn('--push', capture.read_text())
+            capture.unlink()
+            mismatch = subprocess.run(command, cwd=root, env={**environment, 'FAIL_INSTALL': '1'},
+                                      capture_output=True, text=True)
+            self.assertIn('otra clave', mismatch.stderr)
+            self.assertNotIn('uninstall', capture.read_text())
             capture.unlink()
             bad_start = subprocess.run(command, cwd=root, env={**environment, 'FAIL_START': '1'},
                                        capture_output=True, text=True)

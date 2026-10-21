@@ -36,9 +36,16 @@ final class VisualTheme {
             colors[0] = mix(colors[0], accent, 24);
             colors[1] = mix(colors[1], accent, 10);
         }
+        // Focus changes call this on every D-pad step: reuse one drawable instead of allocating.
+        Object owned = hero.getTag(R.id.hero);
+        if (owned instanceof GradientDrawable && hero.getBackground() == owned) {
+            ((GradientDrawable) owned).setColors(colors);
+            return;
+        }
         GradientDrawable background = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT, colors);
         background.setCornerRadius(AppAdapter.dp(context, 22));
+        hero.setTag(R.id.hero, background);
         hero.setBackground(background);
     }
 

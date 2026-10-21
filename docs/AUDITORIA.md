@@ -10,8 +10,10 @@ Revisión estática del código y de la interfaz. La imagen de referencia aporta
 | Zona destacada | Implementado inicialmente | El nombre cambia con el foco; Abrir e Información funcionan sobre la selección. Queda comprobar escala, recorte y navegación con mando en los dos emuladores y una TV. |
 | Tarjetas redondeadas y foco | Implementado inicialmente | Borde visible y animación corta. El arte procede de los APK instalados, con caché acotada; ninguna imagen se descarga. |
 | Catálogo de instaladas | Implementado | Dock horizontal de favoritos y resto de instaladas en cuadrícula desplazable, una entrada por paquete. No hay recomendaciones ni contenido remoto. |
-| Entradas HDMI visibles en fila | Pendiente | El selector de entradas ya existe, pero las entradas enumeradas no aparecen como fila en HOME. Mostrar solo entradas reales detectadas; algunos fabricantes no las exponen por la API pública. |
-| Estado externo, clima, liberador de RAM | Fuera del objetivo actual | No mostrar controles ficticios ni números no verificables. Integraciones externas requerirían permisos, compatibilidad y coste de recursos específicos. |
+| Entradas HDMI visibles en fila | Implementado | Sección «Entradas» al inicio del catálogo con las fuentes que devuelve `TvInputManager` (paso directo y sintonizador), nombre personalizado (API 24+), entradas ocultas excluidas y estado conectada/en espera/sin señal. Se enumera en el hilo de escaneo y se actualiza con `TvInputCallback`; no hay sondeo. Algunos fabricantes no exponen sus entradas por la API pública: en ese caso la fila no aparece. |
+| Memoria libre | Implementado | `ActivityManager.getMemoryInfo` al volver a Inicio, sin temporizador ni permisos; se puede ocultar. |
+| Liberador de RAM, clima, estado externo | Descartado con motivo | `killBackgroundProcesses` requiere un permiso adicional y Android vuelve a crear los procesos; un botón así no libera memoria de forma medible. El clima exige red, que el lanzador no usa. |
+| Salida al lanzador original | Implementado | Personalizar → «Volver al lanzador original» abre otro HOME habilitado; antes de Android 10 retira además la preferencia propia (`clearPackagePreferredActivities`, solo sobre el paquete propio). En Android 10+ HOME es un rol y el cambio definitivo se hace en Ajustes o con `tools/home.py --restore`. |
 
 La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoco. La zona destacada es compacta para dejar altura al catálogo en 720 × 480 y con fuentes ampliadas. No se usa desenfoque, vídeo de fondo, polling ni SDK de telemetría. Esta decisión favorece la TV de poca memoria; la mejora de fluidez debe medirse con `gfxinfo` y `meminfo` antes de afirmarse.
 
@@ -26,13 +28,23 @@ La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoc
 - El acceso directo a Wi-Fi ya no consulta la red ni necesita `ACCESS_NETWORK_STATE`. Los APK debug y release solo pueden declarar el permiso interno `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` que protege receptores dinámicos; no concede acceso a la red.
 - El ZIP del wrapper Gradle 9.8.1 se valida con su SHA-256 oficial; el JAR presente coincide con la suma publicada por Gradle. `gradlew` ya tiene modo Git `100755`.
 
+## Revisión del 21 de octubre de 2026
+
+- Regresión corregida: `test_install` fallaba porque el script ya exige un APK no vacío y el stub de Gradle no lo generaba. El stub ahora produce un APK y la prueba cubre la comprobación previa de API y la clave distinta.
+- Instalación: comprobación previa de `ro.build.version.sdk` contra `minSdk` y de `android.software.leanback` antes de transferir el APK. Ante `INSTALL_FAILED_UPDATE_INCOMPATIBLE` no se desinstala (se perderían favoritos y, si es HOME, el inicio).
+- Rendimiento: la cabecera reutiliza un único `GradientDrawable` y solo se repinta cuando cambia el acento; el selector de entradas ya no consulta `TvInputManager` en el hilo principal en cada `onResume`; `TRIM_MEMORY_UI_HIDDEN` reduce la caché a la mitad en vez de vaciarla; un hilo de decodificación en equipos `isLowRamDevice` o de dos núcleos; banners e iconos a xhdpi/xxhdpi en pantallas de baja densidad.
+- Debloat: los paquetes ausentes se informan todos juntos antes de cancelar, sin cambiar la política de abortar el plan completo.
+- Dependencias: Gradle 9.8.2 (SHA-256 oficial `21bd5da2…9607`), `compileSdk` 37 (identificador del SDK: `platforms;android-37.0`); `targetSdk` se mantiene en 36 porque es lo validado en emuladores de TV, AGP 9.4.1, RecyclerView 1.4.0 y AndroidX Test 1.7.0/1.3.0 ya eran las últimas estables. JDK 21 en CI. Acciones fijadas por SHA: checkout v7.0.1, setup-java v6.1.0, setup-python v7.0.0, setup-android v4.0.4, upload-artifact v7.0.2, android-emulator-runner v2.38.0.
+- Matriz de interfaz: Android TV 14 x86 con 2 GB de RAM y Android TV 16 x86_64 con 2 GB (obligatorias, pasan completas incluidos dos reinicios con restauración del HOME). Android 17 `google_apis` es informativa: su imagen de CI pierde `/sdcard` o el servicio `package` tras arrancar, antes de ejecutar las pruebas.
+
 ## Pendientes con evidencia insuficiente
 
 1. Las pruebas de compilación, lint e interfaz pasaron en los emuladores de TV API 34 y Android API 35 para el cambio visual anterior; repetir la matriz al publicar cada nueva modificación. Las capturas cubren 960 × 540 y 720 × 480, pero no prueban fluidez ni todos los mandos.
 2. Repetir en una TV concreta la activación HOME, dos reinicios, HDMI, mando y restauración. El firmware puede imponer su lanzador y la prueba de emulador no lo predice.
 3. Medir inicio en frío, memoria máxima y frames perdidos antes y después de cambiar tamaños de arte o caché. Los 4 MiB / 2 MiB actuales son límites, no una mejora de rendimiento demostrada.
-4. Investigar la disponibilidad de `platforms;android-37.x` en el SDK usado por CI y después probar API 37. El fallo previo de `platforms;android-37` no demuestra cuál es el identificador correcto ni justifica cambiar `targetSdk` sin ensayo.
+4. API 37: resuelto el identificador (`platforms;android-37.0`); compilación y lint pasan. Subir `targetSdk` a 37 cuando la imagen de Android 17 sea estable en CI o exista una TV con Android 17 donde probarlo.
 5. Decidir la distribución firmada. `assembleRelease` produce un APK sin firmar; el script instala el debug. Crear un flujo de firma privado y actualización sin comprometer la clave antes de usarlo como HOME permanente.
-6. Fijar las acciones de CI por SHA completo cuando se hayan comprobado las revisiones concretas. La etiqueta mayor puede moverse. Revisar además el indicador de HOME de `dumpsys activity`, que no es API pública.
+6. Acciones de CI fijadas por SHA completo (hecho). Queda revisar el indicador de HOME de `dumpsys activity`, que no es API pública.
+7. Comprobar en una TV con entradas HDMI reales los nombres, el orden y el estado de la fila «Entradas»: los emuladores no publican entradas de paso.
 
 La ausencia de permisos de red, identificación y localización en el APK, junto con la revisión del código, respalda que el lanzador no incorpora telemetría propia. Esto no verifica el tráfico de otras apps o del firmware: reducir la telemetría del dispositivo requiere el inventario y la medición de red por firmware descritos en `DISENO.md`.
