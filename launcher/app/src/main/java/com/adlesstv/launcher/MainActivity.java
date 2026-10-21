@@ -184,6 +184,12 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         View[] actions = {inputs, network, settings};
         for (int i = 0; i < actions.length; i++) {
             final int index = i;
+            actions[i].setOnFocusChangeListener((view, focused) -> {
+                if (focused) {
+                    pendingGridPosition = RecyclerView.NO_POSITION;
+                    pendingDockPosition = RecyclerView.NO_POSITION;
+                }
+            });
             actions[i].setOnKeyListener((v, key, event) -> {
                 if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
                 if (key == KeyEvent.KEYCODE_DPAD_UP) return true;
