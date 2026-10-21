@@ -19,7 +19,7 @@ class PrebuiltInstallTests(unittest.TestCase):
             (root / 'app-debug.apk').write_bytes(b'fixture')
             calls = root / 'calls.jsonl'
             adb = root / 'fake adb.ps1'
-            adb.write_text('''param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
+            adb.write_text('''$Arguments = @($args)
 Add-Content -LiteralPath $env:FAKE_CALLS -Value (ConvertTo-Json -InputObject $Arguments -Compress)
 if ($Arguments -contains 'connect') { Write-Output 'connected'; exit 0 }
 if ($Arguments -contains 'get-state') { Write-Output 'device'; exit 0 }
@@ -32,7 +32,7 @@ if ($env:FAIL_START) { Write-Output 'Error: Activity not started' }
 exit 0
 ''', encoding='utf-8-sig')
             python = root / 'fake python.ps1'
-            python.write_text('''param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
+            python.write_text('''$Arguments = @($args)
 Add-Content -LiteralPath $env:FAKE_CALLS -Value (ConvertTo-Json -InputObject $Arguments -Compress)
 if (($Arguments -contains 'apply') -and $env:FAIL_APPLY) { exit 1 }
 exit 0
