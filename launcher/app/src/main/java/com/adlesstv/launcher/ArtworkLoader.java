@@ -68,7 +68,10 @@ final class ArtworkLoader {
         bindings.put(view, Boolean.TRUE);
         final int generation = revision;
         final String key = app.key() + ":" + generation;
-        view.setTag(key);
+        // A recycled tile may request the same app again while an earlier UI callback is queued.
+        // The cache key can match, but each binding must have its own identity.
+        final Object binding = new Object();
+        view.setTag(binding);
         Artwork ready = cache.get(key);
         view.setImageBitmap(ready == null ? null : ready.bitmap);
         if (ready != null || closed) return;
@@ -79,13 +82,13 @@ final class ArtworkLoader {
                 result = new Artwork(render(app));
             } catch (RuntimeException invalidArtwork) {
                 main.post(() -> {
-                    if (!closed && revision == generation && key.equals(view.getTag())) requests.remove(view);
+                    if (!closed && revision == generation && view.getTag() == binding) requests.remove(view);
                 });
                 return;
             }
             if (Thread.currentThread().isInterrupted() || closed || revision != generation) return;
             main.post(() -> {
-                if (!closed && revision == generation && key.equals(view.getTag())) {
+                if (!closed && revision == generation && view.getTag() == binding) {
                     cache.put(key, result);
                     view.setImageBitmap(result.bitmap);
                     requests.remove(view);
