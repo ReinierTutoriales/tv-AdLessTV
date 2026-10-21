@@ -320,11 +320,11 @@ public final class MainActivity extends Activity implements AppAdapter.Listener 
         pendingGridPosition = RecyclerView.NO_POSITION;
         pendingDockPosition = RecyclerView.NO_POSITION;
         artworkReleased = true;
+        artwork.release();
         grid.setAdapter(null);
         dock.setAdapter(null);
         grid.getRecycledViewPool().clear();
         dock.getRecycledViewPool().clear();
-        artwork.invalidate();
     }
 
     @Override protected void onDestroy() {

@@ -15,6 +15,7 @@ import android.widget.ImageView;
 import java.util.IdentityHashMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +44,8 @@ final class ArtworkLoader {
         Future<?> future;
     }
     // These maps are owned by the main thread. Dock and library share a load per component.
+    // Track completed/cache-hit bindings without keeping recycled views alive.
+    private final Map<ImageView, Boolean> bindings = new WeakHashMap<>();
     private final Map<ImageView, Load> requests = new IdentityHashMap<>();
     private final Map<String, Load> loads = new HashMap<>();
     private final LruCache<String, Artwork> cache;
@@ -62,6 +65,7 @@ final class ArtworkLoader {
 
     void bind(ImageView view, AppRepository.App app, AccentTarget target) {
         cancel(view);
+        bindings.put(view, Boolean.TRUE);
         final int generation = revision;
         final String key = app.key() + ":" + generation;
         view.setTag(key);
@@ -160,6 +164,7 @@ final class ArtworkLoader {
     }
 
     void cancel(ImageView view) {
+        bindings.remove(view);
         Load previous = requests.remove(view);
         if (previous != null) {
             previous.targets.remove(view);
@@ -180,8 +185,20 @@ final class ArtworkLoader {
     }
     void trim() { cache.evictAll(); }
 
+    void release() {
+        // RecyclerView can drop a holder without dispatching onViewRecycled after
+        // setAdapter(null). Clear every live binding before detaching its owners.
+        for (ImageView view : new java.util.ArrayList<>(bindings.keySet())) {
+            view.setImageDrawable(null);
+            view.setTag(null);
+        }
+        bindings.clear();
+        invalidate();
+    }
+
     void close() {
         closed = true;
+        release();
         for (ImageView view : new java.util.ArrayList<>(requests.keySet())) cancel(view);
         loads.clear();
         workers.shutdownNow();

@@ -54,8 +54,10 @@ public class ArtworkLoaderTest {
                 assertTrue("Cancelled view must not receive decoded art", bound[2].getDrawable() == null
                         || ((BitmapDrawable) bound[2].getDrawable()).getBitmap() == null);
                 assertNull(bound[2].getTag());
-                loader.get().invalidate();
+                loader.get().release();
                 assertNull(loader.get().bitmap(app));
+                assertNull("Completed bindings must release their bitmap too", bound[0].getDrawable());
+                assertNull(bound[1].getDrawable());
             });
         } finally {
             instrumentation.runOnMainSync(() -> loader.get().close());
