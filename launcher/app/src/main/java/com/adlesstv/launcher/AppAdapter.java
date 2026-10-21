@@ -58,7 +58,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.artwork = artwork;
         this.dock = dock;
         dockWidth = dp(context, context.getResources().getDisplayMetrics().heightPixels
-                < dp(context, 500) ? 108 : 126);
+                < dp(context, 500) ? 148 : 190);
         setHasStableIds(true);
     }
 
@@ -204,7 +204,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         Tile(Context context) {
             super(context);
             setOrientation(VERTICAL);
-            setGravity(Gravity.CENTER);
+            setGravity(Gravity.CENTER_VERTICAL);
             setFocusable(true);
             setFocusableInTouchMode(true);
             setClickable(true);
@@ -220,7 +220,7 @@ final class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             label = new TextView(context);
             label.setTextColor(Color.rgb(240, 242, 247));
             label.setTextSize(16);
-            label.setGravity(Gravity.CENTER);
+            label.setGravity(Gravity.START);
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setIncludeFontPadding(false);

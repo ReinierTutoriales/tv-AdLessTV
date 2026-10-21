@@ -45,12 +45,12 @@ public class HomeUiTest {
             try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(
                     new Intent(context, MainActivity.class))) {
                 scenario.onActivity(activity -> assertEquals(0xFF0A1018,
-                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
-                                .getBackground()).getColor()));
+                        ((android.graphics.drawable.ColorDrawable) ((android.graphics.drawable.LayerDrawable)
+                                activity.findViewById(R.id.root).getBackground()).getDrawable(0)).getColor()));
                 scenario.recreate();
                 scenario.onActivity(activity -> assertEquals(0xFF0A1018,
-                        ((android.graphics.drawable.ColorDrawable) activity.findViewById(R.id.root)
-                                .getBackground()).getColor()));
+                        ((android.graphics.drawable.ColorDrawable) ((android.graphics.drawable.LayerDrawable)
+                                activity.findViewById(R.id.root).getBackground()).getDrawable(0)).getColor()));
             }
         } finally {
             preferences.setVisualTheme(previous);
@@ -93,6 +93,22 @@ public class HomeUiTest {
                 assertTrue(activity.findViewById(R.id.hero_open).isEnabled());
             });
             screenshot("installed-apps.png");
+            AtomicBoolean canOpenLibrary = new AtomicBoolean();
+            scenario.onActivity(activity -> canOpenLibrary.set(
+                    ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.dock)).getAdapter()).firstApp() >= 0
+                    && ((AppAdapter) ((RecyclerView) activity.findViewById(R.id.grid)).getAdapter()).firstApp() >= 0));
+            if (canOpenLibrary.get()) {
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+                waitUntil(scenario, activity -> ((RecyclerView) activity.findViewById(R.id.grid))
+                        .findContainingItemView(activity.getCurrentFocus()) != null);
+                scenario.onActivity(this::checkViewport);
+                screenshot("installed-library.png");
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+                waitUntil(scenario, activity -> activity.findViewById(R.id.library).getVisibility() == View.GONE
+                        && ((RecyclerView) activity.findViewById(R.id.dock))
+                        .findContainingItemView(activity.getCurrentFocus()) != null);
+                scenario.onActivity(this::checkViewport);
+            }
         }
     }
 
@@ -116,6 +132,7 @@ public class HomeUiTest {
                 ((AppAdapter) dock.getAdapter()).replace(fixtures.subList(0, 6), java.util.Collections.emptyList());
                 dock.setVisibility(View.VISIBLE);
                 adapter.replace(java.util.Collections.emptyList(), fixtures.subList(6, fixtures.size()));
+                activity.showLibrary(true);
                 grid.scrollToPosition(1);
             });
             waitUntil(scenario, activity -> {
@@ -234,21 +251,27 @@ public class HomeUiTest {
     private void checkViewport(MainActivity activity) {
         RecyclerView grid = activity.findViewById(R.id.grid);
         View root = activity.findViewById(R.id.root);
-        assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
-        Rect viewport = new Rect();
-        assertTrue(grid.getGlobalVisibleRect(viewport));
-        for (int i = 0; i < grid.getChildCount(); i++) {
-            View child = grid.getChildAt(i);
-            assertTrue("Tile exceeds right column boundary", child.getRight() <= grid.getWidth());
-            assertTrue("Tile exceeds left column boundary", child.getLeft() >= 0);
-        }
         View focused = activity.getCurrentFocus();
-        View tile = focused == null ? null : grid.findContainingItemView(focused);
-        if (tile != null) {
-            int[] origin = new int[2];
-            tile.getLocationOnScreen(origin);
-            assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
-            assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
+        if (activity.findViewById(R.id.library).getVisibility() != View.VISIBLE) {
+            assertTrue("Top shelf must have room for its title", activity.findViewById(R.id.hero).getHeight() > root.getHeight() / 4);
+            assertTrue("Clock pill must not stretch across the screen", activity.findViewById(R.id.clock_pill).getWidth() < root.getWidth() * 0.7f);
+            assertTrue("Hero actions must fit the stage", activity.findViewById(R.id.hero_buttons).getBottom() <= activity.findViewById(R.id.hero).getHeight());
+        } else {
+            assertTrue("The catalog must retain usable vertical space", grid.getHeight() > root.getHeight() / 4);
+            Rect viewport = new Rect();
+            assertTrue(grid.getGlobalVisibleRect(viewport));
+            for (int i = 0; i < grid.getChildCount(); i++) {
+                View child = grid.getChildAt(i);
+                assertTrue("Tile exceeds right column boundary", child.getRight() <= grid.getWidth());
+                assertTrue("Tile exceeds left column boundary", child.getLeft() >= 0);
+            }
+            View tile = focused == null ? null : grid.findContainingItemView(focused);
+            if (tile != null) {
+                int[] origin = new int[2];
+                tile.getLocationOnScreen(origin);
+                assertTrue("Focused tile clipped above", origin[1] >= viewport.top);
+                assertTrue("Focused tile clipped below", origin[1] + tile.getHeight() <= viewport.bottom + 1);
+            }
         }
         RecyclerView dock = activity.findViewById(R.id.dock);
         View dockTile = focused == null ? null : dock.findContainingItemView(focused);

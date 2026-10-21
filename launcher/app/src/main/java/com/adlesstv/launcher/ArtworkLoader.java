@@ -88,7 +88,7 @@ final class ArtworkLoader {
                 int r = Color.red(pixel), g = Color.green(pixel), b = Color.blue(pixel);
                 int high = Math.max(r, Math.max(g, b)), low = Math.min(r, Math.min(g, b));
                 int score = high - low;
-                if (high < 70 || high > 225 || score < 35 || score <= best) continue;
+                if (high < 70 || score < 35 || score <= best) continue;
                 best = score;
                 accent = Color.rgb(r, g, b);
             }

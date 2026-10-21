@@ -57,6 +57,8 @@ Con `tools/profile.py --catalog` se selecciona una lista de investigación de `e
 
 El stick normalmente no tiene puertos HDMI de **entrada** ni sintonizador, pero el software comprueba las entradas ofrecidas por Android antes de ocultar el acceso. Para el debloat usa un perfil del **modelo y fingerprint exactos**, y conserva mando, emparejamiento Bluetooth, Play Services/Store y las funciones que utilices. No se borran datos de apps ni cachés indiscriminadamente.
 
+La portada muestra el nombre de la app seleccionada sobre fondo oscuro y favoritos en tarjetas amplias. Pulsa Abajo para abrir el resto de aplicaciones; Atrás o Arriba desde la primera fila vuelve a la portada. El reloj ocupa su contenido y el acento del fondo procede del arte instalado. La versión visual de prueba es `0.3.0-preview.1`.
+
 ## Construcción e instalación del lanzador
 
 Requiere **JDK 17**, Android SDK **platform 36 / build-tools 36.0.0** y acceso a los repositorios Android/Gradle. Usa Gradle 9.8.1, Android Gradle Plugin 9.4.1, Java y AndroidX RecyclerView. Compila y apunta a Android 16 (API 36), con compatibilidad declarada desde API 23. Android 17 (API 37) ya se publicó, pero el `sdkmanager` del ejecutor de CI aún no encuentra `platforms;android-37`; no se declara compatibilidad comprobada con esa imagen. La CI comprueba Android 15 y Android TV 14; falta comprobar un televisor físico con firmware más reciente. Para crear el APK sin conectar una TV:

@@ -13,7 +13,7 @@ Revisión estática del código y de la interfaz. La imagen de referencia aporta
 | Entradas HDMI visibles en fila | Pendiente | El selector de entradas ya existe, pero las entradas enumeradas no aparecen como fila en HOME. Mostrar solo entradas reales detectadas; algunos fabricantes no las exponen por la API pública. |
 | Estado externo, clima, liberador de RAM | Fuera del objetivo actual | No mostrar controles ficticios ni números no verificables. Integraciones externas requerirían permisos, compatibilidad y coste de recursos específicos. |
 
-La composición mantiene fondo oscuro opaco, márgenes seguros y foco inequívoco. La zona destacada es compacta para dejar altura al catálogo en 720 × 480 y con fuentes ampliadas. No se usa desenfoque, vídeo de fondo, polling ni SDK de telemetría. Esta decisión favorece la TV de poca memoria; la mejora de fluidez debe medirse con `gfxinfo` y `meminfo` antes de afirmarse.
+La revisión de la foto del dispositivo mostró que la composición anterior no respetaba la jerarquía visual solicitada: reloj estirado, paneles grandes y tarjetas pequeñas. La portada revisada elimina esos paneles, amplía título y favoritos y abre la cuadrícula al bajar. El fondo sigue siendo opaco, con un gradiente radial nativo de acento; no usa bitmap de fondo, desenfoque, vídeo ni polling. La memoria y la fluidez todavía deben medirse en el dispositivo. Las pruebas verifican el recorrido portada → biblioteca → portada y conservan evidencia visual para juzgar también composición, no solo compilación.
 
 ## Correcciones verificadas
 
