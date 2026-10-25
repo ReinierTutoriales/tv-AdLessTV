@@ -25,10 +25,10 @@ run_case() {
   adb shell wm size "$resolution"
   adb shell wm density 160
   adb shell settings put system font_scale "$font_scale"
-  adb shell rm -rf /sdcard/Download/AdLessTV-ui
+  adb shell rm -rf /data/local/tmp/AdLessTV-ui
   adb shell dumpsys gfxinfo com.adlesstv.launcher reset > /dev/null || true
   "$ROOT/gradlew" -p "$ROOT" --no-daemon :app:connectedDebugAndroidTest || status=$?
-  adb pull /sdcard/Download/AdLessTV-ui/. "$output/" || true
+  adb pull /data/local/tmp/AdLessTV-ui/. "$output/" || status=1
   if [[ "$status" -ne 0 ]]; then return "$status"; fi
   adb install -r "$ROOT/app/build/outputs/apk/debug/app-debug.apk"
   adb shell am force-stop com.adlesstv.launcher

@@ -403,7 +403,12 @@ public class HomeUiTest {
                         return dockTile != null && dock.getChildAdapterPosition(dockTile) == 0;
                     }
                     View tile = focused == null ? null : grid.findContainingItemView(focused);
-                    return tile != null && grid.getChildAdapterPosition(tile) == expected.get();
+                    if (tile == null || grid.getChildAdapterPosition(tile) != expected.get()) return false;
+                    Rect viewport = new Rect();
+                    int[] origin = new int[2];
+                    tile.getLocationOnScreen(origin);
+                    return grid.getGlobalVisibleRect(viewport) && origin[1] >= viewport.top
+                            && origin[1] + tile.getHeight() <= viewport.bottom + 1;
                 });
                 scenario.onActivity(activity -> checkViewport(activity));
                 if (++step == 16) screenshot("fixture-last-row.png");
@@ -536,9 +541,13 @@ public class HomeUiTest {
             RecyclerView grid = activity.findViewById(R.id.grid);
             View focused = activity.getCurrentFocus();
             View tile = focused == null ? null : grid.findContainingItemView(focused);
+            Rect tileBounds = new Rect(), glassBounds = new Rect();
+            if (focused != null) focused.getGlobalVisibleRect(tileBounds);
+            activity.findViewById(R.id.glass).getGlobalVisibleRect(glassBounds);
             fail("Focus or layout did not settle: focus=" + focused + ", position="
                     + (tile == null ? -1 : grid.getChildAdapterPosition(tile))
-                    + ", scroll=" + grid.getScrollState());
+                    + ", scroll=" + grid.getScrollState() + ", tile=" + tileBounds
+                    + ", glass=" + glassBounds);
         });
     }
     private void shell(String command) throws Exception {
@@ -550,7 +559,7 @@ public class HomeUiTest {
     }
     private void screenshot(String name) throws Exception {
         instrumentation.waitForIdleSync();
-        String directory = "/sdcard/Download/AdLessTV-ui/";
+        String directory = "/data/local/tmp/AdLessTV-ui/";
         shell("mkdir -p " + directory);
         shell("screencap -p " + directory + name);
     }
