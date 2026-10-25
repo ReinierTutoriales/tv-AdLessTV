@@ -1,4 +1,6 @@
 # Changelog
+## 2026-10-24 (1.2.0)
+- Versión publicada 1.2.0 (versionCode 6): incluye todo lo de 0.3.x, probado por el propietario en su TV
 ## 2026-10-21 (0.3.2)
 - Instalación compatible con la salida de pm de Android 6/7; foco conservado al volver con Inicio; cristal tras abrir el catálogo; tema tras desbloquear
 - Sintaxis de Gradle preparada para Gradle 10; compilador sin avisos de obsolescencia

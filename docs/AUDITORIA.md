@@ -4,7 +4,7 @@ La revisión se centra en errores y recursos, conservando la interfaz, los temas
 
 ## Configuración vigente
 
-- Lanzador 0.3.2 (versionCode 5). Android TV API 23+, `compileSdk` 37 y `targetSdk` 36.
+- Lanzador 1.2.0 (versionCode 6). Android TV API 23+, `compileSdk` 37 y `targetSdk` 36.
 - AGP 9.4.1, Gradle 9.8.2 con SHA-256 de distribución y RecyclerView 1.4.0.
 - AndroidX Test runner/core 1.7.0 y ext:junit 1.3.0. Dependencias estables y acciones de CI verificadas el 21 de octubre de 2026; sin migraciones a versiones preliminares.
 - Sin permiso INTERNET. La conexión y el nombre Wi-Fi usan los permisos declarados en la lista cerrada de la CI; la ubicación se solicita a demanda. El servicio de botones del mando es opcional.
